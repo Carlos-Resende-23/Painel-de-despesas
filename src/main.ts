@@ -1,7 +1,36 @@
 import "./style.css"
 import { CATEGORIAS, type Categoria, type Despesa } from "./types.ts"
 
-const despesas: Despesa[] = []
+const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
+
+function ehDespesa(valor: unknown): valor is Despesa {
+  if (typeof valor !== "object" || valor === null) return false
+
+  const registro = valor as Record<string, unknown>
+  return (
+    typeof registro.id === "string" &&
+    typeof registro.titulo === "string" &&
+    registro.titulo.trim().length > 0 &&
+    typeof registro.valor === "number" &&
+    Number.isFinite(registro.valor) &&
+    registro.valor > 0 &&
+    CATEGORIAS.some((categoria) => categoria === registro.categoria)
+  )
+}
+
+function carregarDespesas(): Despesa[] {
+  try {
+    const dados = localStorage.getItem(CHAVE_ARMAZENAMENTO)
+    if (!dados) return []
+
+    const despesasSalvas: unknown = JSON.parse(dados)
+    return Array.isArray(despesasSalvas) ? despesasSalvas.filter(ehDespesa) : []
+  } catch {
+    return []
+  }
+}
+
+const despesas: Despesa[] = carregarDespesas()
 
 function selecionarElemento<T extends Element>(seletor: string): T {
   const elemento = document.querySelector<T>(seletor)
@@ -42,7 +71,7 @@ const nomesCategoria: Record<Categoria, string> = {
 function atualizarResumo(): void {
   const total = despesas.reduce((soma, despesa) => soma + despesa.valor, 0)
   totalGeral.textContent = formatadorMoeda.format(total)
-  quantidadeDespesas.textContent = `${despesas.length} ${despesas.length === 1 ? "despesa" : "despesas"} nesta sessão`
+  quantidadeDespesas.textContent = `${despesas.length} ${despesas.length === 1 ? "despesa" : "despesas"} no total`
   contadorLista.textContent = `${despesas.length} ${despesas.length === 1 ? "item" : "itens"}`
 
   for (const categoria of CATEGORIAS) {
@@ -56,6 +85,15 @@ function atualizarResumo(): void {
     if (elementoTotal) {
       elementoTotal.textContent = formatadorMoeda.format(totalCategoria)
     }
+  }
+}
+
+function salvarDespesas(): boolean {
+  try {
+    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(despesas))
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -79,8 +117,30 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   valor.className = "expense-value"
   valor.textContent = formatadorMoeda.format(despesa.valor)
 
+  const acoes = document.createElement("div")
+  acoes.className = "expense-actions"
+
+  const botaoExcluir = document.createElement("button")
+  botaoExcluir.className = "expense-delete"
+  botaoExcluir.type = "button"
+  botaoExcluir.textContent = "Excluir"
+  botaoExcluir.setAttribute("aria-label", `Excluir despesa: ${despesa.titulo}`)
+  botaoExcluir.addEventListener("click", () => {
+    const indice = despesas.findIndex((item) => item.id === despesa.id)
+    if (indice === -1) return
+
+    despesas.splice(indice, 1)
+    item.remove()
+    listaVazia.hidden = despesas.length > 0
+    atualizarResumo()
+    mensagemFormulario.textContent = salvarDespesas()
+      ? "Despesa excluída."
+      : "Despesa excluída, mas não foi possível salvar a alteração neste navegador."
+  })
+
   detalhes.append(titulo, categoria)
-  item.append(detalhes, valor)
+  acoes.append(valor, botaoExcluir)
+  item.append(detalhes, acoes)
   return item
 }
 
@@ -131,10 +191,17 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   listaDespesas.prepend(criarItemDespesa(despesa))
   listaVazia.hidden = true
   atualizarResumo()
+  const foiSalva = salvarDespesas()
 
   form.reset()
-  mensagemFormulario.textContent = "Despesa adicionada."
+  mensagemFormulario.textContent = foiSalva
+    ? "Despesa adicionada."
+    : "Despesa adicionada, mas não foi possível salvar neste navegador."
   tituloInput.focus()
 })
 
+for (const despesa of [...despesas].reverse()) {
+  listaDespesas.append(criarItemDespesa(despesa))
+}
+listaVazia.hidden = despesas.length > 0
 atualizarResumo()
