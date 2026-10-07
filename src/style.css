@@ -402,7 +402,14 @@ h1 {
   font-size: 12px;
 }
 
-.submit-button {
+.form-actions .actions-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.submit-button,
+.cancel-button {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -411,8 +418,6 @@ h1 {
   padding: 0 16px;
   border: 0;
   border-radius: 4px;
-  color: #fff;
-  background: var(--pine);
   cursor: pointer;
   font-size: 12px;
   font-weight: 650;
@@ -421,11 +426,29 @@ h1 {
     transform 150ms ease;
 }
 
+.submit-button {
+  color: #fff;
+  background: var(--pine);
+}
+
 .submit-button:hover {
   background: #28564a;
 }
 
 .submit-button:active {
+  transform: translateY(1px);
+}
+
+.cancel-button {
+  color: #4f6056;
+  background: #edf2ee;
+}
+
+.cancel-button:hover {
+  background: #e4ece6;
+}
+
+.cancel-button:active {
   transform: translateY(1px);
 }
 
@@ -575,19 +598,38 @@ h1 {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
+.expense-edit,
 .expense-delete {
   min-height: 32px;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: #8b5145;
-  background: transparent;
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
+}
+
+.expense-edit {
+  color: #335343;
+  background: #edf4ef;
+}
+
+.expense-edit:hover {
+  border-color: #d4e6d7;
+  background: #e4f0e7;
+}
+
+.expense-edit:focus-visible {
+  outline: 3px solid rgba(53, 104, 82, 0.18);
+  outline-offset: 2px;
+}
+
+.expense-delete {
+  color: #8b5145;
+  background: transparent;
 }
 
 .expense-delete:hover {

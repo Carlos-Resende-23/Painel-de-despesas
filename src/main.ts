@@ -54,6 +54,12 @@ const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
 )
 const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
+const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
+const botaoCancelarEdicao = selecionarElemento<HTMLButtonElement>(
+  "#cancelar-edicao",
+)
+
+let despesaEmEdicaoId: string | null = null
 
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -97,9 +103,23 @@ function salvarDespesas(): boolean {
   }
 }
 
+function limparFormulario(): void {
+  form.reset()
+  despesaEmEdicaoId = null
+  botaoSubmit.textContent = "Adicionar despesa"
+  botaoCancelarEdicao.hidden = true
+}
+
+function preencherFormulario(despesa: Despesa): void {
+  tituloInput.value = despesa.titulo
+  valorInput.value = String(despesa.valor)
+  categoriaInput.value = despesa.categoria
+}
+
 function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const item = document.createElement("li")
   item.className = "expense-item"
+  item.dataset.despesaId = despesa.id
 
   const detalhes = document.createElement("div")
   detalhes.className = "expense-details"
@@ -120,18 +140,36 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const acoes = document.createElement("div")
   acoes.className = "expense-actions"
 
+  const botaoEditar = document.createElement("button")
+  botaoEditar.className = "expense-edit"
+  botaoEditar.type = "button"
+  botaoEditar.textContent = "Editar"
+  botaoEditar.setAttribute("aria-label", `Editar despesa: ${despesa.titulo}`)
+  botaoEditar.addEventListener("click", () => {
+    despesaEmEdicaoId = despesa.id
+    preencherFormulario(despesa)
+    botaoSubmit.textContent = "Salvar alterações"
+    botaoCancelarEdicao.hidden = false
+    mensagemFormulario.textContent = "Editando despesa."
+    tituloInput.focus()
+  })
+
   const botaoExcluir = document.createElement("button")
   botaoExcluir.className = "expense-delete"
   botaoExcluir.type = "button"
   botaoExcluir.textContent = "Excluir"
   botaoExcluir.setAttribute("aria-label", `Excluir despesa: ${despesa.titulo}`)
   botaoExcluir.addEventListener("click", () => {
-    const indice = despesas.findIndex((item) => item.id === despesa.id)
+    const indice = despesas.findIndex((itemAtual) => itemAtual.id === despesa.id)
     if (indice === -1) return
 
     despesas.splice(indice, 1)
-    item.remove()
-    listaVazia.hidden = despesas.length > 0
+
+    if (despesaEmEdicaoId === despesa.id) {
+      limparFormulario()
+    }
+
+    renderizarLista()
     atualizarResumo()
     mensagemFormulario.textContent = salvarDespesas()
       ? "Despesa excluída."
@@ -139,9 +177,17 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   })
 
   detalhes.append(titulo, categoria)
-  acoes.append(valor, botaoExcluir)
+  acoes.append(valor, botaoEditar, botaoExcluir)
   item.append(detalhes, acoes)
   return item
+}
+
+function renderizarLista(): void {
+  listaDespesas.innerHTML = ""
+  for (const despesa of [...despesas].reverse()) {
+    listaDespesas.append(criarItemDespesa(despesa))
+  }
+  listaVazia.hidden = despesas.length > 0
 }
 
 function marcarCampoInvalido(
@@ -180,28 +226,44 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     return
   }
 
-  const despesa: Despesa = {
-    id: crypto.randomUUID(),
-    titulo,
-    valor,
-    categoria: categoriaSelecionada as Categoria,
+  if (despesaEmEdicaoId) {
+    const despesa = despesas.find((item) => item.id === despesaEmEdicaoId)
+
+    if (despesa) {
+      despesa.titulo = titulo
+      despesa.valor = valor
+      despesa.categoria = categoriaSelecionada as Categoria
+    }
+  } else {
+    despesas.push({
+      id: crypto.randomUUID(),
+      titulo,
+      valor,
+      categoria: categoriaSelecionada as Categoria,
+    })
   }
 
-  despesas.push(despesa)
-  listaDespesas.prepend(criarItemDespesa(despesa))
-  listaVazia.hidden = true
-  atualizarResumo()
   const foiSalva = salvarDespesas()
+  renderizarLista()
+  atualizarResumo()
+  const mensagem = despesaEmEdicaoId
+    ? foiSalva
+      ? "Despesa atualizada."
+      : "Despesa atualizada, mas não foi possível salvar neste navegador."
+    : foiSalva
+      ? "Despesa adicionada."
+      : "Despesa adicionada, mas não foi possível salvar neste navegador."
 
-  form.reset()
-  mensagemFormulario.textContent = foiSalva
-    ? "Despesa adicionada."
-    : "Despesa adicionada, mas não foi possível salvar neste navegador."
+  limparFormulario()
+  mensagemFormulario.textContent = mensagem
   tituloInput.focus()
 })
 
-for (const despesa of [...despesas].reverse()) {
-  listaDespesas.append(criarItemDespesa(despesa))
-}
-listaVazia.hidden = despesas.length > 0
+botaoCancelarEdicao.addEventListener("click", () => {
+  limparFormulario()
+  mensagemFormulario.textContent = "Edição cancelada."
+})
+
+renderizarLista()
 atualizarResumo()
+limparFormulario()
