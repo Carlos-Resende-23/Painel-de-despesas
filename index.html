@@ -29,6 +29,31 @@
             </p>
           </div>
 
+          <div class="budget-panel">
+            <p class="summary-label">Meta mensal</p>
+            <div class="budget-input-wrap">
+              <span aria-hidden="true">R$</span>
+              <input
+                id="meta-mensal"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="0,00"
+              />
+            </div>
+            <p id="meta-mensal-status" class="summary-note">
+              Defina uma meta para acompanhar seu orçamento.
+            </p>
+          </div>
+
+          <div class="period-panel">
+            <label for="mes-filtro">Período</label>
+            <select id="mes-filtro" aria-label="Filtrar despesas por mês">
+              <option value="todos">Todos os meses</option>
+            </select>
+          </div>
+
           <div class="category-summary">
             <h3>Por categoria</h3>
             <ul id="totais-por-categoria" class="category-totals">

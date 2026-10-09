@@ -146,6 +146,69 @@ select {
   font-size: 11px;
 }
 
+.budget-panel,
+.period-panel {
+  margin-top: 28px;
+}
+
+.budget-input-wrap {
+  position: relative;
+  margin-top: 10px;
+}
+
+.budget-input-wrap > span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: #dfeadf;
+  font-size: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.budget-input-wrap input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 32px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f5ec;
+  outline: none;
+}
+
+.budget-input-wrap input:focus {
+  border-color: rgba(217, 237, 114, 0.8);
+  box-shadow: 0 0 0 3px rgba(217, 237, 114, 0.18);
+}
+
+.period-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.period-panel label {
+  color: #dce6dc;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.period-panel select {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f5ec;
+  outline: none;
+}
+
+.period-panel select:focus {
+  border-color: rgba(217, 237, 114, 0.8);
+  box-shadow: 0 0 0 3px rgba(217, 237, 114, 0.18);
+}
+
 .category-summary {
   margin-top: 37px;
 }

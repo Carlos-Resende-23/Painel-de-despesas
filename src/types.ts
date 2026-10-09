@@ -13,4 +13,5 @@ export type Despesa = {
   titulo: string
   valor: number
   categoria: Categoria
+  data?: string
 }

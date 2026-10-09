@@ -2,11 +2,19 @@ import "./style.css"
 import { CATEGORIAS, type Categoria, type Despesa } from "./types.ts"
 
 const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
+const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
 
-function ehDespesa(valor: unknown): valor is Despesa {
+type DespesaPersistida = Despesa & {
+  data?: string
+}
+
+function ehDespesa(valor: unknown): valor is DespesaPersistida {
   if (typeof valor !== "object" || valor === null) return false
 
   const registro = valor as Record<string, unknown>
+  const dataValida =
+    typeof registro.data !== "string" || !Number.isNaN(Date.parse(registro.data))
+
   return (
     typeof registro.id === "string" &&
     typeof registro.titulo === "string" &&
@@ -14,7 +22,8 @@ function ehDespesa(valor: unknown): valor is Despesa {
     typeof registro.valor === "number" &&
     Number.isFinite(registro.valor) &&
     registro.valor > 0 &&
-    CATEGORIAS.some((categoria) => categoria === registro.categoria)
+    CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
+    dataValida
   )
 }
 
@@ -24,9 +33,52 @@ function carregarDespesas(): Despesa[] {
     if (!dados) return []
 
     const despesasSalvas: unknown = JSON.parse(dados)
-    return Array.isArray(despesasSalvas) ? despesasSalvas.filter(ehDespesa) : []
+
+    if (Array.isArray(despesasSalvas)) {
+      return despesasSalvas
+        .filter(ehDespesa)
+        .map((despesa) => ({
+          ...despesa,
+          data: despesa.data ?? new Date().toISOString(),
+        }))
+    }
+
+    if (typeof despesasSalvas === "object" && despesasSalvas !== null) {
+      const estado = despesasSalvas as { despesas?: unknown[] }
+      if (Array.isArray(estado.despesas)) {
+        return estado.despesas
+          .filter(ehDespesa)
+          .map((despesa) => ({
+            ...despesa,
+            data: despesa.data ?? new Date().toISOString(),
+          }))
+      }
+    }
+
+    return []
   } catch {
     return []
+  }
+}
+
+function carregarMetaMensal(): number {
+  try {
+    const dados = localStorage.getItem(CHAVE_META_MENSAL)
+    if (!dados) return 0
+
+    const valor = Number(dados)
+    return Number.isFinite(valor) && valor >= 0 ? valor : 0
+  } catch {
+    return 0
+  }
+}
+
+function salvarMetaMensal(valor: number): boolean {
+  try {
+    localStorage.setItem(CHAVE_META_MENSAL, String(valor))
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -58,6 +110,11 @@ const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
 const botaoCancelarEdicao = selecionarElemento<HTMLButtonElement>(
   "#cancelar-edicao",
 )
+const inputMetaMensal = selecionarElemento<HTMLInputElement>("#meta-mensal")
+const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
+  "#meta-mensal-status",
+)
+const filtroMes = selecionarElemento<HTMLSelectElement>("#mes-filtro")
 
 let despesaEmEdicaoId: string | null = null
 
@@ -74,14 +131,64 @@ const nomesCategoria: Record<Categoria, string> = {
   outros: "Outros",
 }
 
+function obterMesDaData(dataISO?: string): string {
+  const data = new Date(dataISO ?? new Date().toISOString())
+  const mes = String(data.getMonth() + 1).padStart(2, "0")
+  const ano = data.getFullYear()
+  return `${ano}-${mes}`
+}
+
+function formatarNomeMes(anoMes: string): string {
+  const [ano, mes] = anoMes.split("-").map(Number)
+  return new Date(ano, mes - 1, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  })
+}
+
+function obterDespesasVisiveis(): Despesa[] {
+  if (filtroMes.value === "todos") {
+    return [...despesas]
+  }
+
+  return despesas.filter(
+    (despesa) => obterMesDaData(despesa.data ?? new Date().toISOString()) === filtroMes.value,
+  )
+}
+
+function atualizarListaMeses(): void {
+  const mesesDisponiveis = [...new Set(despesas.map((despesa) => obterMesDaData(despesa.data ?? new Date().toISOString())))].sort().reverse()
+
+  const opcoes = mesesDisponiveis.map((mes) => {
+    const option = document.createElement("option")
+    option.value = mes
+    option.textContent = formatarNomeMes(mes)
+    return option
+  })
+
+  const valorAtual = filtroMes.value
+  filtroMes.innerHTML = '<option value="todos">Todos os meses</option>'
+  opcoes.forEach((option) => filtroMes.append(option))
+
+  if (mesesDisponiveis.includes(valorAtual)) {
+    filtroMes.value = valorAtual
+  } else {
+    filtroMes.value = "todos"
+  }
+}
+
 function atualizarResumo(): void {
-  const total = despesas.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const despesasVisiveis = obterDespesasVisiveis()
+  const total = despesasVisiveis.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const metaMensal = Number(inputMetaMensal.value || 0)
+  const mesEmFoco = filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
+
   totalGeral.textContent = formatadorMoeda.format(total)
-  quantidadeDespesas.textContent = `${despesas.length} ${despesas.length === 1 ? "despesa" : "despesas"} no total`
-  contadorLista.textContent = `${despesas.length} ${despesas.length === 1 ? "item" : "itens"}`
+  quantidadeDespesas.textContent = `${despesasVisiveis.length} ${despesasVisiveis.length === 1 ? "despesa" : "despesas"} ${filtroMes.value === "todos" ? "no total" : `em ${formatarNomeMes(mesEmFoco)}`}`
+  contadorLista.textContent = `${despesasVisiveis.length} ${despesasVisiveis.length === 1 ? "item" : "itens"}`
 
   for (const categoria of CATEGORIAS) {
-    const totalCategoria = despesas
+    const totalCategoria = despesasVisiveis
       .filter((despesa) => despesa.categoria === categoria)
       .reduce((soma, despesa) => soma + despesa.valor, 0)
     const elementoTotal = document.querySelector<HTMLElement>(
@@ -91,6 +198,22 @@ function atualizarResumo(): void {
     if (elementoTotal) {
       elementoTotal.textContent = formatadorMoeda.format(totalCategoria)
     }
+  }
+
+  if (metaMensal > 0) {
+    const totalMesMeta = despesas.filter(
+      (despesa) => obterMesDaData(despesa.data ?? new Date().toISOString()) === mesEmFoco,
+    ).reduce((soma, despesa) => soma + despesa.valor, 0)
+
+    const restante = metaMensal - totalMesMeta
+
+    if (totalMesMeta <= metaMensal) {
+      statusMetaMensal.textContent = `Você já gastou ${formatadorMoeda.format(totalMesMeta)} de ${formatadorMoeda.format(metaMensal)}. Faltam ${formatadorMoeda.format(restante)} para atingir a meta.`
+    } else {
+      statusMetaMensal.textContent = `Você ultrapassou a meta em ${formatadorMoeda.format(Math.abs(restante))}.`
+    }
+  } else {
+    statusMetaMensal.textContent = "Defina uma meta para acompanhar seu orçamento."
   }
 }
 
@@ -170,6 +293,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
     }
 
     renderizarLista()
+    atualizarListaMeses()
     atualizarResumo()
     mensagemFormulario.textContent = salvarDespesas()
       ? "Despesa excluída."
@@ -183,11 +307,14 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
 }
 
 function renderizarLista(): void {
+  const despesasVisiveis = obterDespesasVisiveis()
   listaDespesas.innerHTML = ""
-  for (const despesa of [...despesas].reverse()) {
+
+  for (const despesa of [...despesasVisiveis].reverse()) {
     listaDespesas.append(criarItemDespesa(despesa))
   }
-  listaVazia.hidden = despesas.length > 0
+
+  listaVazia.hidden = despesasVisiveis.length > 0
 }
 
 function marcarCampoInvalido(
@@ -226,6 +353,14 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     return
   }
 
+  const novaDespesa: Despesa = {
+    id: crypto.randomUUID(),
+    titulo,
+    valor,
+    categoria: categoriaSelecionada as Categoria,
+    data: new Date().toISOString(),
+  }
+
   if (despesaEmEdicaoId) {
     const despesa = despesas.find((item) => item.id === despesaEmEdicaoId)
 
@@ -233,17 +368,14 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesa.titulo = titulo
       despesa.valor = valor
       despesa.categoria = categoriaSelecionada as Categoria
+      despesa.data = despesa.data ?? new Date().toISOString()
     }
   } else {
-    despesas.push({
-      id: crypto.randomUUID(),
-      titulo,
-      valor,
-      categoria: categoriaSelecionada as Categoria,
-    })
+    despesas.push(novaDespesa)
   }
 
   const foiSalva = salvarDespesas()
+  atualizarListaMeses()
   renderizarLista()
   atualizarResumo()
   const mensagem = despesaEmEdicaoId
@@ -264,6 +396,22 @@ botaoCancelarEdicao.addEventListener("click", () => {
   mensagemFormulario.textContent = "Edição cancelada."
 })
 
+filtroMes.addEventListener("change", () => {
+  renderizarLista()
+  atualizarResumo()
+})
+
+inputMetaMensal.addEventListener("input", () => {
+  const valorMeta = Number(inputMetaMensal.value)
+  const metaValida = Number.isFinite(valorMeta) && valorMeta >= 0 ? valorMeta : 0
+
+  salvarMetaMensal(metaValida)
+  atualizarResumo()
+})
+
+inputMetaMensal.value = String(carregarMetaMensal())
+
+atualizarListaMeses()
 renderizarLista()
 atualizarResumo()
 limparFormulario()
