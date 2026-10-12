@@ -379,10 +379,11 @@ h1 {
 
 .form-fields {
   display: grid;
-  grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 0.8fr) minmax(
-      150px,
-      0.9fr
-    );
+  grid-template-columns:
+    minmax(180px, 1.5fr)
+    minmax(110px, 0.7fr)
+    minmax(140px, 0.9fr)
+    minmax(150px, 0.9fr);
   gap: 16px;
 }
 
@@ -618,6 +619,12 @@ h1 {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
+}
+
+.expense-date {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .category-badge {

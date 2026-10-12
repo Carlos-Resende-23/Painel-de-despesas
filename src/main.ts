@@ -8,12 +8,30 @@ type DespesaPersistida = Despesa & {
   data?: string
 }
 
+function obterDataLocal(data = new Date()): string {
+  const ano = data.getFullYear()
+  const mes = String(data.getMonth() + 1).padStart(2, "0")
+  const dia = String(data.getDate()).padStart(2, "0")
+  return `${dia}-${mes}-${ano}`
+}
+
+function obterDataParaFormulario(data?: string): string {
+  if (!data) return obterDataLocal()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data)) return data
+
+  const dataConvertida = new Date(data)
+  return Number.isNaN(dataConvertida.getTime())
+    ? obterDataLocal()
+    : obterDataLocal(dataConvertida)
+}
+
 function ehDespesa(valor: unknown): valor is DespesaPersistida {
   if (typeof valor !== "object" || valor === null) return false
 
   const registro = valor as Record<string, unknown>
   const dataValida =
-    typeof registro.data !== "string" || !Number.isNaN(Date.parse(registro.data))
+    typeof registro.data !== "string" ||
+    !Number.isNaN(Date.parse(registro.data))
 
   return (
     typeof registro.id === "string" &&
@@ -35,23 +53,19 @@ function carregarDespesas(): Despesa[] {
     const despesasSalvas: unknown = JSON.parse(dados)
 
     if (Array.isArray(despesasSalvas)) {
-      return despesasSalvas
-        .filter(ehDespesa)
-        .map((despesa) => ({
-          ...despesa,
-          data: despesa.data ?? new Date().toISOString(),
-        }))
+      return despesasSalvas.filter(ehDespesa).map((despesa) => ({
+        ...despesa,
+        data: despesa.data ?? obterDataLocal(),
+      }))
     }
 
     if (typeof despesasSalvas === "object" && despesasSalvas !== null) {
       const estado = despesasSalvas as { despesas?: unknown[] }
       if (Array.isArray(estado.despesas)) {
-        return estado.despesas
-          .filter(ehDespesa)
-          .map((despesa) => ({
-            ...despesa,
-            data: despesa.data ?? new Date().toISOString(),
-          }))
+        return estado.despesas.filter(ehDespesa).map((despesa) => ({
+          ...despesa,
+          data: despesa.data ?? obterDataLocal(),
+        }))
       }
     }
 
@@ -95,6 +109,7 @@ function selecionarElemento<T extends Element>(seletor: string): T {
 const form = selecionarElemento<HTMLFormElement>("#form-despesa")
 const tituloInput = selecionarElemento<HTMLInputElement>("#titulo")
 const valorInput = selecionarElemento<HTMLInputElement>("#valor")
+const dataInput = selecionarElemento<HTMLInputElement>("#data-despesa")
 const categoriaInput = selecionarElemento<HTMLSelectElement>("#categoria")
 const mensagemFormulario = selecionarElemento<HTMLParagraphElement>(
   "#mensagem-formulario",
@@ -107,9 +122,8 @@ const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
 )
 const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
 const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
-const botaoCancelarEdicao = selecionarElemento<HTMLButtonElement>(
-  "#cancelar-edicao",
-)
+const botaoCancelarEdicao =
+  selecionarElemento<HTMLButtonElement>("#cancelar-edicao")
 const inputMetaMensal = selecionarElemento<HTMLInputElement>("#meta-mensal")
 const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
   "#meta-mensal-status",
@@ -132,10 +146,16 @@ const nomesCategoria: Record<Categoria, string> = {
 }
 
 function obterMesDaData(dataISO?: string): string {
-  const data = new Date(dataISO ?? new Date().toISOString())
-  const mes = String(data.getMonth() + 1).padStart(2, "0")
-  const ano = data.getFullYear()
-  return `${ano}-${mes}`
+  const data = dataISO ?? obterDataLocal()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data)) return data.slice(0, 7)
+
+  return obterDataLocal(new Date(data)).slice(0, 7)
+}
+
+function formatarData(dataISO?: string): string {
+  const data = obterDataParaFormulario(dataISO)
+  const [ano, mes, dia] = data.split("-").map(Number)
+  return new Date(ano, mes - 1, dia).toLocaleDateString("pt-BR")
 }
 
 function formatarNomeMes(anoMes: string): string {
@@ -152,12 +172,22 @@ function obterDespesasVisiveis(): Despesa[] {
   }
 
   return despesas.filter(
-    (despesa) => obterMesDaData(despesa.data ?? new Date().toISOString()) === filtroMes.value,
+    (despesa) =>
+      obterMesDaData(despesa.data ?? new Date().toISOString()) ===
+      filtroMes.value,
   )
 }
 
 function atualizarListaMeses(): void {
-  const mesesDisponiveis = [...new Set(despesas.map((despesa) => obterMesDaData(despesa.data ?? new Date().toISOString())))].sort().reverse()
+  const mesesDisponiveis = [
+    ...new Set(
+      despesas.map((despesa) =>
+        obterMesDaData(despesa.data ?? new Date().toISOString()),
+      ),
+    ),
+  ]
+    .sort()
+    .reverse()
 
   const opcoes = mesesDisponiveis.map((mes) => {
     const option = document.createElement("option")
@@ -179,9 +209,13 @@ function atualizarListaMeses(): void {
 
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
-  const total = despesasVisiveis.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const total = despesasVisiveis.reduce(
+    (soma, despesa) => soma + despesa.valor,
+    0,
+  )
   const metaMensal = Number(inputMetaMensal.value || 0)
-  const mesEmFoco = filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
+  const mesEmFoco =
+    filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
 
   totalGeral.textContent = formatadorMoeda.format(total)
   quantidadeDespesas.textContent = `${despesasVisiveis.length} ${despesasVisiveis.length === 1 ? "despesa" : "despesas"} ${filtroMes.value === "todos" ? "no total" : `em ${formatarNomeMes(mesEmFoco)}`}`
@@ -201,9 +235,13 @@ function atualizarResumo(): void {
   }
 
   if (metaMensal > 0) {
-    const totalMesMeta = despesas.filter(
-      (despesa) => obterMesDaData(despesa.data ?? new Date().toISOString()) === mesEmFoco,
-    ).reduce((soma, despesa) => soma + despesa.valor, 0)
+    const totalMesMeta = despesas
+      .filter(
+        (despesa) =>
+          obterMesDaData(despesa.data ?? new Date().toISOString()) ===
+          mesEmFoco,
+      )
+      .reduce((soma, despesa) => soma + despesa.valor, 0)
 
     const restante = metaMensal - totalMesMeta
 
@@ -213,7 +251,8 @@ function atualizarResumo(): void {
       statusMetaMensal.textContent = `Você ultrapassou a meta em ${formatadorMoeda.format(Math.abs(restante))}.`
     }
   } else {
-    statusMetaMensal.textContent = "Defina uma meta para acompanhar seu orçamento."
+    statusMetaMensal.textContent =
+      "Defina uma meta para acompanhar seu orçamento."
   }
 }
 
@@ -228,6 +267,7 @@ function salvarDespesas(): boolean {
 
 function limparFormulario(): void {
   form.reset()
+  dataInput.value = obterDataLocal()
   despesaEmEdicaoId = null
   botaoSubmit.textContent = "Adicionar despesa"
   botaoCancelarEdicao.hidden = true
@@ -236,6 +276,7 @@ function limparFormulario(): void {
 function preencherFormulario(despesa: Despesa): void {
   tituloInput.value = despesa.titulo
   valorInput.value = String(despesa.valor)
+  dataInput.value = obterDataParaFormulario(despesa.data)
   categoriaInput.value = despesa.categoria
 }
 
@@ -255,6 +296,11 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   categoria.className = "category-badge"
   categoria.dataset.category = despesa.categoria
   categoria.textContent = nomesCategoria[despesa.categoria]
+
+  const data = document.createElement("time")
+  data.className = "expense-date"
+  data.dateTime = obterDataParaFormulario(despesa.data)
+  data.textContent = formatarData(despesa.data)
 
   const valor = document.createElement("p")
   valor.className = "expense-value"
@@ -283,7 +329,9 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   botaoExcluir.textContent = "Excluir"
   botaoExcluir.setAttribute("aria-label", `Excluir despesa: ${despesa.titulo}`)
   botaoExcluir.addEventListener("click", () => {
-    const indice = despesas.findIndex((itemAtual) => itemAtual.id === despesa.id)
+    const indice = despesas.findIndex(
+      (itemAtual) => itemAtual.id === despesa.id,
+    )
     if (indice === -1) return
 
     despesas.splice(indice, 1)
@@ -300,7 +348,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
       : "Despesa excluída, mas não foi possível salvar a alteração neste navegador."
   })
 
-  detalhes.append(titulo, categoria)
+  detalhes.append(titulo, categoria, data)
   acoes.append(valor, botaoEditar, botaoExcluir)
   item.append(detalhes, acoes)
   return item
@@ -324,7 +372,7 @@ function marcarCampoInvalido(
 }
 
 function limparErros(): void {
-  for (const campo of [tituloInput, valorInput, categoriaInput]) {
+  for (const campo of [tituloInput, valorInput, dataInput, categoriaInput]) {
     campo.removeAttribute("aria-invalid")
   }
   mensagemFormulario.textContent = ""
@@ -336,11 +384,13 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
 
   const titulo = tituloInput.value.trim()
   const valor = Number(valorInput.value)
+  const data = dataInput.value
   const categoriaSelecionada = categoriaInput.value
   const camposInvalidos: Array<HTMLInputElement | HTMLSelectElement> = []
 
   if (!titulo) camposInvalidos.push(tituloInput)
   if (!Number.isFinite(valor) || valor <= 0) camposInvalidos.push(valorInput)
+  if (!data) camposInvalidos.push(dataInput)
   if (!CATEGORIAS.some((categoria) => categoria === categoriaSelecionada)) {
     camposInvalidos.push(categoriaInput)
   }
@@ -348,7 +398,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   if (camposInvalidos.length > 0) {
     camposInvalidos.forEach(marcarCampoInvalido)
     mensagemFormulario.textContent =
-      "Preencha título, valor maior que zero e categoria."
+      "Preencha título, valor maior que zero, data e categoria."
     camposInvalidos[0].focus()
     return
   }
@@ -358,7 +408,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     titulo,
     valor,
     categoria: categoriaSelecionada as Categoria,
-    data: new Date().toISOString(),
+    data,
   }
 
   if (despesaEmEdicaoId) {
@@ -368,7 +418,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesa.titulo = titulo
       despesa.valor = valor
       despesa.categoria = categoriaSelecionada as Categoria
-      despesa.data = despesa.data ?? new Date().toISOString()
+      despesa.data = data
     }
   } else {
     despesas.push(novaDespesa)
@@ -403,7 +453,8 @@ filtroMes.addEventListener("change", () => {
 
 inputMetaMensal.addEventListener("input", () => {
   const valorMeta = Number(inputMetaMensal.value)
-  const metaValida = Number.isFinite(valorMeta) && valorMeta >= 0 ? valorMeta : 0
+  const metaValida =
+    Number.isFinite(valorMeta) && valorMeta >= 0 ? valorMeta : 0
 
   salvarMetaMensal(metaValida)
   atualizarResumo()
