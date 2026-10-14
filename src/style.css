@@ -213,7 +213,8 @@ select {
   margin-top: 37px;
 }
 
-.category-summary h3 {
+.category-summary h3,
+.chart-header h3 {
   margin: 0 0 13px;
   color: #dce6dc;
   font-size: 12px;
@@ -237,6 +238,88 @@ select {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: #f1f3ea;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-panel {
+  margin-top: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 18px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chart-caption {
+  color: #b9d0c0;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.category-chart {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: #eef4ee;
+  font-size: 10px;
+}
+
+.chart-label {
+  overflow: hidden;
+  color: #dce6dc;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.chart-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  min-width: 0;
+  transition: width 180ms ease;
+}
+
+.chart-bar[data-chart-category="alimento"] {
+  background: var(--food);
+}
+.chart-bar[data-chart-category="transporte"] {
+  background: var(--transport);
+}
+.chart-bar[data-chart-category="lazer"] {
+  background: var(--leisure);
+}
+.chart-bar[data-chart-category="saúde"] {
+  background: var(--health);
+}
+.chart-bar[data-chart-category="outros"] {
+  background: var(--other);
+}
+
+.chart-value {
+  color: #f1f3ea;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
 

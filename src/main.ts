@@ -121,6 +121,8 @@ const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
 )
 const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
+const chartCategorias = selecionarElemento<HTMLDivElement>("#grafico-categorias")
+const chartCaption = selecionarElemento<HTMLSpanElement>("#chart-caption")
 const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
 const botaoCancelarEdicao =
   selecionarElemento<HTMLButtonElement>("#cancelar-edicao")
@@ -207,6 +209,59 @@ function atualizarListaMeses(): void {
   }
 }
 
+function atualizarGraficoCategorias(despesasVisiveis: Despesa[]): void {
+  const totais = CATEGORIAS.map((categoria) => ({
+    categoria,
+    total: despesasVisiveis
+      .filter((despesa) => despesa.categoria === categoria)
+      .reduce((soma, despesa) => soma + despesa.valor, 0),
+  }))
+
+  const maiorTotal = Math.max(...totais.map((item) => item.total), 0)
+  const categoriaEmDestaque = totais.reduce(
+    (maior, item) => (item.total > maior.total ? item : maior),
+    totais[0] ?? { categoria: "alimento", total: 0 },
+  )
+
+  chartCategorias.innerHTML = ""
+
+  for (const item of totais) {
+    const linha = document.createElement("div")
+    linha.className = "chart-row"
+
+    const label = document.createElement("span")
+    label.className = "chart-label"
+    label.textContent = nomesCategoria[item.categoria]
+
+    const track = document.createElement("div")
+    track.className = "chart-track"
+
+    const barra = document.createElement("span")
+    barra.className = "chart-bar"
+    barra.dataset.chartCategory = item.categoria
+    barra.style.width = maiorTotal > 0 ? `${(item.total / maiorTotal) * 100}%` : "0%"
+    track.append(barra)
+
+    const valor = document.createElement("strong")
+    valor.className = "chart-value"
+    valor.textContent = formatadorMoeda.format(item.total)
+
+    linha.append(label, track, valor)
+    chartCategorias.append(linha)
+  }
+
+  const totalGasto = despesasVisiveis.reduce((soma, despesa) => soma + despesa.valor, 0)
+
+  if (totalGasto > 0 && categoriaEmDestaque.total > 0) {
+    const percentual = Math.round(
+      (categoriaEmDestaque.total / totalGasto) * 100,
+    )
+    chartCaption.textContent = `${percentual}% em ${nomesCategoria[categoriaEmDestaque.categoria]}`
+  } else {
+    chartCaption.textContent = "Sem dados"
+  }
+}
+
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   const total = despesasVisiveis.reduce(
@@ -233,6 +288,8 @@ function atualizarResumo(): void {
       elementoTotal.textContent = formatadorMoeda.format(totalCategoria)
     }
   }
+
+  atualizarGraficoCategorias(despesasVisiveis)
 
   if (metaMensal > 0) {
     const totalMesMeta = despesas
