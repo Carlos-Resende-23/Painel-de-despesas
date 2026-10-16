@@ -112,6 +112,9 @@ const mensagemFormulario = selecionarElemento<HTMLParagraphElement>(
 )
 const listaDespesas = selecionarElemento<HTMLUListElement>("#lista-despesas")
 const listaVazia = selecionarElemento<HTMLParagraphElement>("#lista-vazia")
+const botaoExportar = selecionarElemento<HTMLButtonElement>(
+  "#exportar-despesas",
+)
 const totalGeral = selecionarElemento<HTMLParagraphElement>("#total-geral")
 const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
@@ -410,12 +413,44 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
 function renderizarLista(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   listaDespesas.innerHTML = ""
+  botaoExportar.disabled = despesasVisiveis.length === 0
 
   for (const despesa of [...despesasVisiveis].reverse()) {
     listaDespesas.append(criarItemDespesa(despesa))
   }
 
   listaVazia.hidden = despesasVisiveis.length > 0
+}
+
+function exportarDespesasVisiveis(): void {
+  const linhas = [
+    ["Título", "Valor", "Categoria", "Data"],
+    ...[...obterDespesasVisiveis()].reverse().map((despesa) => [
+      despesa.titulo,
+      despesa.valor.toFixed(2).replace(".", ","),
+      nomesCategoria[despesa.categoria],
+      formatarData(despesa.data),
+    ]),
+  ]
+  const conteudo = linhas
+    .map((linha) =>
+      linha.map((valor) => `"${valor.replaceAll('"', '""')}"`).join(";"),
+    )
+    .join("\r\n")
+  const arquivo = new Blob(["\uFEFF", conteudo], {
+    type: "text/csv;charset=utf-8",
+  })
+  const url = URL.createObjectURL(arquivo)
+  const link = document.createElement("a")
+  link.href = url
+  link.download =
+    filtroMes.value === "todos"
+      ? "despesas-todos-os-meses.csv"
+      : `despesas-${filtroMes.value}.csv`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 function marcarCampoInvalido(
@@ -503,6 +538,8 @@ filtroMes.addEventListener("change", () => {
   renderizarLista()
   atualizarResumo()
 })
+
+botaoExportar.addEventListener("click", exportarDespesasVisiveis)
 
 inputMetaMensal.addEventListener("input", () => {
   const valorMeta = Number(inputMetaMensal.value)
