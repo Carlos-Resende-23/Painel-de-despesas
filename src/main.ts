@@ -4,21 +4,43 @@ import { CATEGORIAS, type Categoria, type Despesa } from "./types.ts"
 const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
 const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
 
-function obterDataLocal(data = new Date()): string {
+function obterDataISOlocal(data = new Date()): string {
   const ano = data.getFullYear()
   const mes = String(data.getMonth() + 1).padStart(2, "0")
   const dia = String(data.getDate()).padStart(2, "0")
-  return `${dia}-${mes}-${ano}`
+  return `${ano}-${mes}-${dia}`
 }
 
 function obterDataParaFormulario(data?: string): string {
-  if (!data) return obterDataLocal()
+  if (!data) return obterDataISOlocal()
   if (/^\d{4}-\d{2}-\d{2}$/.test(data)) return data
+
+  const dataBrasileira = /^(\d{2})-(\d{2})-(\d{4})$/.exec(data)
+  if (dataBrasileira) {
+    return `${dataBrasileira[3]}-${dataBrasileira[2]}-${dataBrasileira[1]}`
+  }
 
   const dataConvertida = new Date(data)
   return Number.isNaN(dataConvertida.getTime())
-    ? obterDataLocal()
-    : obterDataLocal(dataConvertida)
+    ? obterDataISOlocal()
+    : obterDataISOlocal(dataConvertida)
+}
+
+function ehDataValida(data: string): boolean {
+  const dataBrasileira = /^(\d{2})-(\d{2})-(\d{4})$/.exec(data)
+  const dataISO = dataBrasileira
+    ? `${dataBrasileira[3]}-${dataBrasileira[2]}-${dataBrasileira[1]}`
+    : data
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) {
+    return !Number.isNaN(Date.parse(data))
+  }
+
+  const dataConvertida = new Date(`${dataISO}T00:00:00Z`)
+  return (
+    !Number.isNaN(dataConvertida.getTime()) &&
+    dataConvertida.toISOString().slice(0, 10) === dataISO
+  )
 }
 
 function ehDespesa(valor: unknown): valor is Despesa {
@@ -27,7 +49,7 @@ function ehDespesa(valor: unknown): valor is Despesa {
   const registro = valor as Record<string, unknown>
   const dataValida =
     typeof registro.data !== "string" ||
-    !Number.isNaN(Date.parse(registro.data))
+    ehDataValida(registro.data)
 
   return (
     typeof registro.id === "string" &&
@@ -51,7 +73,7 @@ function carregarDespesas(): Despesa[] {
     if (Array.isArray(despesasSalvas)) {
       return despesasSalvas.filter(ehDespesa).map((despesa) => ({
         ...despesa,
-        data: despesa.data ?? obterDataLocal(),
+        data: obterDataParaFormulario(despesa.data),
       }))
     }
 
@@ -60,7 +82,7 @@ function carregarDespesas(): Despesa[] {
       if (Array.isArray(estado.despesas)) {
         return estado.despesas.filter(ehDespesa).map((despesa) => ({
           ...despesa,
-          data: despesa.data ?? obterDataLocal(),
+          data: obterDataParaFormulario(despesa.data),
         }))
       }
     }
@@ -147,10 +169,16 @@ const nomesCategoria: Record<Categoria, string> = {
 }
 
 function obterMesDaData(dataISO?: string): string {
-  const data = dataISO ?? obterDataLocal()
+  const data = dataISO ?? obterDataISOlocal()
   if (/^\d{4}-\d{2}-\d{2}$/.test(data)) return data.slice(0, 7)
 
-  return obterDataLocal(new Date(data)).slice(0, 7)
+  const dataBrasileira = /^(\d{2})-(\d{2})-(\d{4})$/.exec(data)
+  if (dataBrasileira) return `${dataBrasileira[3]}-${dataBrasileira[2]}`
+
+  const dataConvertida = new Date(data)
+  return Number.isNaN(dataConvertida.getTime())
+    ? obterDataISOlocal().slice(0, 7)
+    : obterDataISOlocal(dataConvertida).slice(0, 7)
 }
 
 function formatarData(dataISO?: string): string {
@@ -323,7 +351,7 @@ function salvarDespesas(): boolean {
 
 function limparFormulario(): void {
   form.reset()
-  dataInput.value = obterDataLocal()
+  dataInput.value = obterDataISOlocal()
   despesaEmEdicaoId = null
   botaoSubmit.textContent = "Adicionar despesa"
   botaoCancelarEdicao.hidden = true
