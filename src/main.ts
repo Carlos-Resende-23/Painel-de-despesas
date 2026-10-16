@@ -4,10 +4,6 @@ import { CATEGORIAS, type Categoria, type Despesa } from "./types.ts"
 const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
 const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
 
-type DespesaPersistida = Despesa & {
-  data?: string
-}
-
 function obterDataLocal(data = new Date()): string {
   const ano = data.getFullYear()
   const mes = String(data.getMonth() + 1).padStart(2, "0")
@@ -25,7 +21,7 @@ function obterDataParaFormulario(data?: string): string {
     : obterDataLocal(dataConvertida)
 }
 
-function ehDespesa(valor: unknown): valor is DespesaPersistida {
+function ehDespesa(valor: unknown): valor is Despesa {
   if (typeof valor !== "object" || valor === null) return false
 
   const registro = valor as Record<string, unknown>

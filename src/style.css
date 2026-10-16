@@ -1,7 +1,7 @@
 :root {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   color: #1e302b;
-  background: #f2f4ef;
+  background: var(--canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -16,7 +16,6 @@
   --pine-light: #b7c9bd;
   --lime: #d9ed72;
   --coral: #d86f52;
-  --blue: #c9e0eb;
   --food: #f0c56d;
   --transport: #8fc8b1;
   --leisure: #edaa91;
@@ -671,6 +670,7 @@ h1 {
 
 .expense-list {
   display: grid;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -678,33 +678,48 @@ h1 {
 
 .expense-item {
   display: flex;
-  min-height: 76px;
+  min-height: 86px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 15px 5px;
-  border-bottom: 1px solid var(--line);
+  gap: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgba(39, 57, 47, 0.035);
   animation: enter 240ms both;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.expense-item:hover {
+  border-color: #cbd8ce;
+  box-shadow: 0 7px 18px rgba(39, 57, 47, 0.07);
+  transform: translateY(-1px);
 }
 
 .expense-details {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px 10px;
 }
 
 .expense-title {
+  grid-column: 1 / -1;
   overflow-wrap: anywhere;
   margin: 0;
   color: #2a3932;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 650;
   line-height: 1.35;
 }
 
 .expense-date {
+  justify-self: start;
   color: var(--muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -712,13 +727,14 @@ h1 {
 
 .category-badge {
   display: inline-flex;
-  min-height: 21px;
+  min-height: 23px;
   align-items: center;
   padding: 0 8px;
-  border-radius: 3px;
+  border-radius: 99px;
   color: #39443e;
   background: #edf0eb;
   font-size: 10px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -742,9 +758,9 @@ h1 {
   flex: 0 0 auto;
   margin: 0;
   color: #253c33;
-  font-size: 14px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .expense-actions {
@@ -930,6 +946,22 @@ h1 {
 
   .expenses-section {
     margin-top: 35px;
+  }
+
+  .expense-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .expense-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .expense-value {
+    margin-right: auto;
   }
 }
 
