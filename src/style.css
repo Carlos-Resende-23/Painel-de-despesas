@@ -631,9 +631,17 @@ h1 {
 
 .expenses-controls {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.backup-status {
+  min-height: 17px;
+  margin: 0 0 12px;
+  color: #53675d;
+  font-size: 12px;
 }
 
 .export-button {
@@ -984,6 +992,16 @@ h1 {
 
   .expenses-section {
     margin-top: 35px;
+  }
+
+  .expenses-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .expenses-controls {
+    justify-content: flex-start;
+    gap: 8px;
   }
 
   .expense-item {

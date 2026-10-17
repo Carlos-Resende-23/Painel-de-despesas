@@ -234,6 +234,20 @@
             <div class="expenses-controls">
               <span class="expense-count" id="contador-lista">0 itens</span>
               <button
+                id="exportar-backup"
+                class="export-button"
+                type="button"
+              >
+                Exportar backup
+              </button>
+              <button
+                id="importar-backup"
+                class="export-button"
+                type="button"
+              >
+                Importar backup
+              </button>
+              <button
                 id="exportar-despesas"
                 class="export-button"
                 type="button"
@@ -241,8 +255,15 @@
               >
                 Exportar CSV
               </button>
+              <input
+                id="arquivo-backup"
+                type="file"
+                accept="application/json,.json"
+                hidden
+              />
             </div>
           </div>
+          <p id="backup-status" class="backup-status" role="status" aria-live="polite"></p>
           <p id="lista-vazia" class="empty-state">
             <span class="empty-mark" aria-hidden="true">—</span>
             <span class="empty-title">Nada por aqui ainda</span>

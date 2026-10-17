@@ -2,6 +2,12 @@
 
 Painel de despesas desenvolvido com Vite e TypeScript.
 
+As despesas e a meta mensal são salvas no navegador. Para transferir ou
+proteger esses dados, use **Exportar backup** para baixar um arquivo JSON e
+**Importar backup** para restaurá-lo. A importação substitui os dados atuais
+após confirmação; o CSV continua disponível para exportar despesas para
+planilhas.
+
 ## GitHub Pages
 
 O workflow em `.github/workflows/deploy.yml` compila e publica o site no GitHub

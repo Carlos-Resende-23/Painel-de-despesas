@@ -137,6 +137,13 @@ const listaVazia = selecionarElemento<HTMLParagraphElement>("#lista-vazia")
 const botaoExportar = selecionarElemento<HTMLButtonElement>(
   "#exportar-despesas",
 )
+const botaoExportarBackup =
+  selecionarElemento<HTMLButtonElement>("#exportar-backup")
+const botaoImportarBackup =
+  selecionarElemento<HTMLButtonElement>("#importar-backup")
+const arquivoBackup = selecionarElemento<HTMLInputElement>("#arquivo-backup")
+const statusBackup =
+  selecionarElemento<HTMLParagraphElement>("#backup-status")
 const totalGeral = selecionarElemento<HTMLParagraphElement>("#total-geral")
 const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
@@ -481,6 +488,159 @@ function exportarDespesasVisiveis(): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+function exportarBackup(): void {
+  const backup = {
+    formato: "painel-de-despesas",
+    versao: 1,
+    exportadoEm: new Date().toISOString(),
+    despesas,
+    metaMensal: Number(inputMetaMensal.value || 0),
+  }
+  const arquivo = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json;charset=utf-8",
+  })
+  const url = URL.createObjectURL(arquivo)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `backup-despesas-${obterDataISOlocal()}.json`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  statusBackup.textContent = "Backup exportado."
+}
+
+function ehBackup(valor: unknown): valor is {
+  formato: "painel-de-despesas"
+  versao: 1
+  despesas: Despesa[]
+  metaMensal: number
+} {
+  if (typeof valor !== "object" || valor === null) return false
+
+  const backup = valor as Record<string, unknown>
+  if (
+    backup.formato !== "painel-de-despesas" ||
+    backup.versao !== 1 ||
+    !Array.isArray(backup.despesas) ||
+    typeof backup.metaMensal !== "number" ||
+    !Number.isFinite(backup.metaMensal) ||
+    backup.metaMensal < 0
+  ) {
+    return false
+  }
+
+  const ids = new Set<string>()
+  for (const despesa of backup.despesas) {
+    if (
+      !ehDespesa(despesa) ||
+      !despesa.id.trim() ||
+      (despesa.data !== undefined &&
+        (typeof despesa.data !== "string" || !ehDataValida(despesa.data))) ||
+      ids.has(despesa.id)
+    ) {
+      return false
+    }
+    ids.add(despesa.id)
+  }
+
+  return true
+}
+
+function restaurarValorArmazenado(chave: string, valor: string | null): boolean {
+  try {
+    if (valor === null) {
+      localStorage.removeItem(chave)
+    } else {
+      localStorage.setItem(chave, valor)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+function salvarBackupImportado(backup: {
+  despesas: Despesa[]
+  metaMensal: number
+}): "salvo" | "falhou" | "falhou-parcial" {
+  let despesasAnteriores: string | null
+  let metaAnterior: string | null
+
+  try {
+    despesasAnteriores = localStorage.getItem(CHAVE_ARMAZENAMENTO)
+    metaAnterior = localStorage.getItem(CHAVE_META_MENSAL)
+  } catch {
+    return "falhou"
+  }
+
+  let despesasGravadas = false
+  let metaGravada = false
+  try {
+    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(backup.despesas))
+    despesasGravadas = true
+    localStorage.setItem(CHAVE_META_MENSAL, String(backup.metaMensal))
+    metaGravada = true
+    return "salvo"
+  } catch {
+    const despesasRestauradas =
+      !despesasGravadas ||
+      restaurarValorArmazenado(CHAVE_ARMAZENAMENTO, despesasAnteriores)
+    const metaRestaurada =
+      !metaGravada || restaurarValorArmazenado(CHAVE_META_MENSAL, metaAnterior)
+    return despesasRestauradas && metaRestaurada ? "falhou" : "falhou-parcial"
+  }
+}
+
+async function importarBackup(arquivo: File): Promise<void> {
+  if (arquivo.size > 5 * 1024 * 1024) {
+    statusBackup.textContent = "O arquivo de backup excede o limite de 5 MB."
+    return
+  }
+
+  let backup: unknown
+  try {
+    backup = JSON.parse(await arquivo.text())
+  } catch {
+    statusBackup.textContent = "Não foi possível ler o arquivo JSON."
+    return
+  }
+
+  if (!ehBackup(backup)) {
+    statusBackup.textContent =
+      "Arquivo inválido ou incompatível. Selecione um backup JSON deste painel."
+    return
+  }
+
+  const quantidadeAtual = `${despesas.length} ${despesas.length === 1 ? "despesa atual" : "despesas atuais"}`
+  const quantidadeBackup = `${backup.despesas.length} ${backup.despesas.length === 1 ? "despesa" : "despesas"}`
+  const confirmou = window.confirm(
+    `Este backup substituirá ${quantidadeAtual} por ${quantidadeBackup} e atualizará a meta mensal. Deseja continuar?`,
+  )
+  if (!confirmou) {
+    statusBackup.textContent = "Importação cancelada."
+    return
+  }
+
+  const resultado = salvarBackupImportado(backup)
+  if (resultado !== "salvo") {
+    statusBackup.textContent =
+      resultado === "falhou"
+        ? "Não foi possível salvar o backup. Os dados atuais foram preservados."
+        : "Falha ao salvar e restaurar os dados anteriores. Verifique o armazenamento do navegador."
+    return
+  }
+
+  despesas.splice(0, despesas.length)
+  backup.despesas.forEach((despesa) => despesas.push({ ...despesa }))
+  inputMetaMensal.value = String(backup.metaMensal)
+  limparFormulario()
+  atualizarListaMeses()
+  renderizarLista()
+  atualizarResumo()
+  statusBackup.textContent = `Backup importado com sucesso: ${backup.despesas.length} ${backup.despesas.length === 1 ? "despesa" : "despesas"}.`
+}
+
 function marcarCampoInvalido(
   campo: HTMLInputElement | HTMLSelectElement,
 ): void {
@@ -568,6 +728,20 @@ filtroMes.addEventListener("change", () => {
 })
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)
+botaoExportarBackup.addEventListener("click", exportarBackup)
+botaoImportarBackup.addEventListener("click", () => {
+  arquivoBackup.click()
+})
+arquivoBackup.addEventListener("change", async () => {
+  const arquivo = arquivoBackup.files?.[0]
+  if (!arquivo) return
+
+  try {
+    await importarBackup(arquivo)
+  } finally {
+    arquivoBackup.value = ""
+  }
+})
 
 inputMetaMensal.addEventListener("input", () => {
   const valorMeta = Number(inputMetaMensal.value)
