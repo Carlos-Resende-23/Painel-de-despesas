@@ -637,6 +637,44 @@ h1 {
   gap: 12px;
 }
 
+.expense-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(190px, 0.7fr);
+  gap: 14px;
+  margin: 0 0 16px;
+}
+
+.expense-filter {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.expense-filter label {
+  color: #53675d;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.expense-filter input,
+.expense-filter select {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid #dce3dc;
+  border-radius: 4px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font-size: 12px;
+}
+
+.expense-filter input:focus,
+.expense-filter select:focus {
+  border-color: #5f8c76;
+  box-shadow: 0 0 0 3px rgba(95, 140, 118, 0.13);
+}
+
 .backup-status {
   min-height: 17px;
   margin: 0 0 12px;
@@ -1002,6 +1040,11 @@ h1 {
   .expenses-controls {
     justify-content: flex-start;
     gap: 8px;
+  }
+
+  .expense-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
   }
 
   .expense-item {

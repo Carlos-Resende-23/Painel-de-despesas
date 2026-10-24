@@ -159,6 +159,15 @@ const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
   "#meta-mensal-status",
 )
 const filtroMes = selecionarElemento<HTMLSelectElement>("#mes-filtro")
+const filtroTexto = selecionarElemento<HTMLInputElement>("#filtro-texto")
+const filtroCategoria =
+  selecionarElemento<HTMLSelectElement>("#filtro-categoria")
+const tituloListaVazia = selecionarElemento<HTMLSpanElement>(
+  "#lista-vazia-titulo",
+)
+const descricaoListaVazia = selecionarElemento<HTMLSpanElement>(
+  "#lista-vazia-descricao",
+)
 
 let despesaEmEdicaoId: string | null = null
 
@@ -203,15 +212,31 @@ function formatarNomeMes(anoMes: string): string {
 }
 
 function obterDespesasVisiveis(): Despesa[] {
-  if (filtroMes.value === "todos") {
-    return [...despesas]
-  }
+  const textoBusca = filtroTexto.value
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
 
-  return despesas.filter(
-    (despesa) =>
+  return despesas.filter((despesa) => {
+    const tituloNormalizado = despesa.titulo
+      .toLocaleLowerCase("pt-BR")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+    const correspondeAoMes =
+      filtroMes.value === "todos" ||
       obterMesDaData(despesa.data ?? new Date().toISOString()) ===
-      filtroMes.value,
-  )
+        filtroMes.value
+    const correspondeACategoria =
+      filtroCategoria.value === "todas" ||
+      despesa.categoria === filtroCategoria.value
+
+    return (
+      correspondeAoMes &&
+      correspondeACategoria &&
+      tituloNormalizado.includes(textoBusca)
+    )
+  })
 }
 
 function atualizarListaMeses(): void {
@@ -454,7 +479,18 @@ function renderizarLista(): void {
     listaDespesas.append(criarItemDespesa(despesa))
   }
 
-  listaVazia.hidden = despesasVisiveis.length > 0
+  const listaSemResultados = despesasVisiveis.length === 0
+  listaVazia.hidden = !listaSemResultados
+
+  if (listaSemResultados && despesas.length > 0) {
+    tituloListaVazia.textContent = "Nenhuma despesa encontrada"
+    descricaoListaVazia.textContent =
+      "Ajuste os filtros para ver outros lançamentos."
+  } else {
+    tituloListaVazia.textContent = "Nada por aqui ainda"
+    descricaoListaVazia.textContent =
+      "As despesas que você adicionar vão aparecer nesta lista."
+  }
 }
 
 function exportarDespesasVisiveis(): void {
@@ -722,10 +758,14 @@ botaoCancelarEdicao.addEventListener("click", () => {
   mensagemFormulario.textContent = "Edição cancelada."
 })
 
-filtroMes.addEventListener("change", () => {
+function atualizarDespesasFiltradas(): void {
   renderizarLista()
   atualizarResumo()
-})
+}
+
+filtroMes.addEventListener("change", atualizarDespesasFiltradas)
+filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
+filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)
 botaoExportarBackup.addEventListener("click", exportarBackup)

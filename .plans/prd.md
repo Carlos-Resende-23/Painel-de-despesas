@@ -2,11 +2,11 @@
 
 ## 1. Visão geral
 
-Aplicação web para registrar e visualizar despesas pessoais em tempo real. O usuário adiciona despesas com título, valor e categoria; a interface exibe a lista de despesas e um resumo financeiro na lateral esquerda.
+Aplicação web para registrar e acompanhar despesas pessoais. O usuário pode cadastrar, editar e excluir lançamentos, consultar totais e distribuição por categoria, filtrar por período, categoria e título, definir uma meta mensal e exportar ou importar seus dados.
 
 **Stack:** Vite + TypeScript (vanilla), HTML e CSS.  
-**Persistência:** nenhuma — os dados existem apenas em memória durante a sessão.  
-**Estado atual do repositório:** projeto Vite inicializado; `src/main.ts` vazio; estrutura semântica da interface definida em `index.html`; TypeScript responsável apenas por estado, validação e atualização dos elementos existentes.
+**Persistência:** despesas e meta mensal salvas no `localStorage` do navegador.
+**Estado atual do repositório:** aplicação funcional com interface responsiva, formulário de despesas, resumo financeiro, filtros combináveis, operações de edição e exclusão, exportação CSV e backup JSON.
 
 ---
 
@@ -14,9 +14,10 @@ Aplicação web para registrar e visualizar despesas pessoais em tempo real. O u
 
 | Objetivo            | Descrição                                                                    |
 | ------------------- | ---------------------------------------------------------------------------- |
-| Registrar despesas  | Permitir adicionar despesas com título, valor e categoria                    |
-| Visualizar despesas | Listar todas as despesas adicionadas na sessão                               |
-| Resumir gastos      | Exibir total geral e total por categoria na sidebar                          |
+| Registrar despesas  | Adicionar, editar e excluir despesas com título, valor, data e categoria      |
+| Visualizar despesas | Consultar lançamentos e filtrar por mês, categoria e título                   |
+| Resumir gastos      | Exibir totais, distribuição por categoria e acompanhamento da meta mensal    |
+| Proteger dados      | Persistir dados no navegador e permitir exportar/importar backup              |
 | Simplicidade        | Código legível, fácil de manter, sem frameworks ou abstrações desnecessárias |
 
 ---
@@ -27,44 +28,57 @@ Aplicação web para registrar e visualizar despesas pessoais em tempo real. O u
 
 | ID    | Requisito                                                                                                                                      | Prioridade |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| RF-01 | O usuário deve preencher **título** (texto), **valor** (número positivo) e **categoria** (seleção entre as categorias fixas)                   | Must       |
+| RF-01 | O usuário deve preencher **título**, **valor positivo**, **data** e uma **categoria fixa**                                                     | Must       |
 | RF-02 | Ao confirmar o envio do formulário, uma nova despesa é criada e adicionada à lista                                                             | Must       |
 | RF-03 | Cada despesa recebe um **id** único (`string`) gerado automaticamente                                                                          | Must       |
-| RF-04 | Campos inválidos (título vazio, valor ≤ 0 ou não numérico, categoria não selecionada) devem impedir a criação e dar feedback visual ao usuário | Should     |
+| RF-04 | Campos inválidos (título vazio, valor ≤ 0 ou não numérico, data vazia ou categoria inválida) impedem o salvamento e exibem feedback acessível | Must       |
 | RF-05 | Após adicionar com sucesso, o formulário deve ser limpo para permitir nova entrada                                                             | Should     |
 
 ### 3.2 Listar despesas
 
 | ID    | Requisito                                                                                                                                          | Prioridade |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| RF-06 | Todas as despesas da sessão são exibidas abaixo do card de adição                                                                                  | Must       |
-| RF-07 | Cada item da lista exibe **título**, **valor** formatado como moeda e **categoria**                                                                | Must       |
-| RF-08 | Quando não houver despesas, exibe o estado vazio já presente no HTML (mensagem ou placeholder), controlado via TypeScript (`hidden` ou classe CSS) | Should     |
-| RF-09 | A lista é atualizada imediatamente após cada adição                                                                                                | Must       |
+| RF-06 | As despesas correspondentes aos filtros selecionados são exibidas abaixo do formulário                                                       | Must       |
+| RF-07 | Cada item exibe **título**, **valor**, **categoria** e **data** formatados                                                                    | Must       |
+| RF-08 | Exibe mensagens distintas quando ainda não há despesas e quando os filtros não encontram resultados                                         | Must       |
+| RF-09 | A lista é atualizada imediatamente após adicionar, editar, excluir ou alterar filtros                                                       | Must       |
+| RF-10 | A busca por título é parcial, sem diferenciar maiúsculas/minúsculas ou acentos                                                              | Must       |
+| RF-11 | Os filtros de mês, categoria e título são combinados; os campos de busca e categoria podem ser limpos para remover seus critérios           | Must       |
 
 ### 3.3 Resumo financeiro (sidebar)
 
 | ID    | Requisito                                                                      | Prioridade |
 | ----- | ------------------------------------------------------------------------------ | ---------- |
-| RF-10 | A sidebar exibe a **soma total** de todas as despesas                          | Must       |
-| RF-11 | A sidebar exibe o **total por categoria** para cada uma das 5 categorias fixas | Must       |
-| RF-12 | Categorias sem despesas exibem total **R$ 0,00** (ou equivalente)              | Must       |
-| RF-13 | Os totais são recalculados automaticamente a cada nova despesa adicionada      | Must       |
+| RF-12 | A sidebar exibe a soma e a quantidade das despesas correspondentes aos filtros | Must       |
+| RF-13 | A sidebar exibe total por categoria, inclusive **R$ 0,00** para categorias sem despesas | Must |
+| RF-14 | O gráfico apresenta a distribuição por categoria das despesas filtradas        | Must       |
+| RF-15 | Os totais e o gráfico são recalculados após alterações e mudanças nos filtros  | Must       |
+| RF-16 | A meta é comparada com todos os gastos do mês em foco, sem restringir por busca ou categoria | Must |
 
-### 3.4 Categorias
+### 3.4 Gerenciar lançamentos e orçamento
 
 | ID    | Requisito                                                                                 | Prioridade |
 | ----- | ----------------------------------------------------------------------------------------- | ---------- |
-| RF-14 | As categorias são fixas e imutáveis: `alimento`, `transporte`, `lazer`, `saúde`, `outros` | Must       |
-| RF-15 | O usuário seleciona a categoria apenas no momento de adicionar a despesa                  | Must       |
+| RF-17 | O usuário pode editar e excluir uma despesa; editar reutiliza o formulário de lançamento | Must |
+| RF-18 | A meta mensal aceita valores maiores ou iguais a zero e é salva no navegador             | Must |
+| RF-19 | As categorias são fixas: `alimento`, `transporte`, `lazer`, `saúde`, `outros`             | Must |
 
-### 3.5 Fora do escopo funcional
+### 3.5 Persistência e transferência de dados
 
-- Editar ou excluir despesas
-- Filtrar ou ordenar a lista
-- Persistência (localStorage, API, banco de dados)
-- Autenticação ou multiusuário
-- Exportação de dados
+| ID    | Requisito                                                                                 | Prioridade |
+| ----- | ----------------------------------------------------------------------------------------- | ---------- |
+| RF-20 | Despesas e meta mensal persistem entre recargas no mesmo navegador                        | Must |
+| RF-21 | A exportação CSV inclui somente as despesas visíveis após aplicação dos filtros           | Must |
+| RF-22 | O backup JSON inclui todas as despesas e a meta, independentemente dos filtros ativos     | Must |
+| RF-23 | A importação valida formato, versão, campos e ids; pede confirmação antes de substituir os dados | Must |
+| RF-24 | Erros de leitura, validação ou armazenamento são comunicados sem substituir dados existentes | Must |
+
+### 3.6 Fora do escopo funcional
+
+- Sincronização entre dispositivos ou armazenamento em nuvem
+- Autenticação ou suporte multiusuário
+- Categorias personalizadas
+- Importação de CSV
 
 ---
 
@@ -79,7 +93,7 @@ Aplicação web para registrar e visualizar despesas pessoais em tempo real. O u
 | RT-03  | Estilização via **CSS** em arquivo dedicado (`src/style.css`)                                                                                         |
 | RT-04  | **Estrutura HTML completa** da interface (sidebar, formulário, containers de lista e estado vazio) definida em `index.html`                           |
 | RT-04a | TypeScript **não monta** o layout inteiro dentro de `#app` (proibido `innerHTML` com a página completa ou criação programática da estrutura estática) |
-| RT-04b | TypeScript atualiza apenas **dados e conteúdo dinâmico**: textos de totais, visibilidade do estado vazio, itens da lista de despesas                  |
+| RT-04b | TypeScript atualiza dados e conteúdo dinâmico: totais, mensagens de estado vazio, gráfico, opções de mês e itens da lista                    |
 
 ### 4.2 Arquitetura de código
 
@@ -104,14 +118,16 @@ type Despesa = {
   titulo: string
   valor: number
   categoria: Categoria
+  data?: string
 }
 ```
 
 | ID    | Requisito                                                                                    |
 | ----- | -------------------------------------------------------------------------------------------- |
-| RT-10 | Estado da aplicação: array de `Despesa[]` mantido em memória                                 |
-| RT-11 | Geração de `id`: string única por despesa (ex.: `crypto.randomUUID()` ou timestamp + random) |
+| RT-10 | Estado das despesas: array de `Despesa[]`, sincronizado com `localStorage`                    |
+| RT-11 | Geração de `id`: string única por despesa (ex.: `crypto.randomUUID()`)                       |
 | RT-12 | Valor armazenado como `number`; formatação monetária apenas na camada de apresentação        |
+| RT-13 | Dados lidos do armazenamento ou backup são validados antes de uso                            |
 
 ### 4.4 Separação HTML × TypeScript
 
@@ -218,33 +234,42 @@ A divisão em módulos extras é opcional; priorizar simplicidade. Funções pur
 | ID    | Requisito                                                                        | Prioridade |
 | ----- | -------------------------------------------------------------------------------- | ---------- |
 | RV-11 | Cada despesa em item/card separado ou linha com separador visual                 | Must       |
-| RV-12 | Informações por item: título, valor (destaque), badge ou tag de categoria        | Must       |
-| RV-13 | Estado vazio amigável definido no HTML; visível apenas quando a lista está vazia | Should     |
+| RV-12 | Informações por item: título, valor (destaque), badge ou tag de categoria e data | Must       |
+| RV-13 | Estado vazio distingue lista sem despesas de ausência de resultados pelos filtros | Must |
+| RV-14 | A lista oferece busca por título e filtro por categoria, além do filtro de mês na sidebar | Must |
+| RV-15 | Busca não diferencia maiúsculas/minúsculas nem acentos                              | Must       |
 
 ### 5.5 Identidade visual
 
-| ID    | Requisito                                                                                                   | Prioridade |
-| ----- | ----------------------------------------------------------------------------------------------------------- | ---------- |
-| RV-14 | Paleta coerente e legível (contraste adequado para texto e valores)                                         | Should     |
-| RV-15 | Tipografia system-ui ou similar, sem dependência de fontes externas obrigatórias                            | Could      |
-| RV-16 | Atualizar `<title>` e `lang` do HTML para refletir o app (ex.: `lang="pt-BR"`, título "Painel de Despesas") | Should     |
+| ID    | Requisito                                                                    | Prioridade |
+| ----- | ---------------------------------------------------------------------------- | ---------- |
+| RV-16 | Paleta coerente e legível (contraste adequado para texto e valores)          | Should     |
+| RV-17 | Tipografia sem dependência de fontes externas obrigatórias                   | Could      |
+| RV-18 | HTML em português brasileiro com título "Painel de Despesas"                 | Should     |
 
 ---
 
 ## 6. Fluxos principais
 
-### 6.1 Adicionar despesa
+### 6.1 Adicionar e gerenciar despesa
 
-1. Usuário preenche título, valor e categoria no card.
-2. Usuário clica em "Adicionar".
-3. TypeScript valida os dados.
-4. Se válido: cria `Despesa`, adiciona ao array, atualiza textos da sidebar, insere item na lista (e oculta estado vazio), limpa formulário.
-5. Se inválido: exibe feedback (borda vermelha, mensagem ou alerta) sem alterar a lista.
+1. Usuário preenche título, valor, data e categoria.
+2. TypeScript valida os campos e, se válidos, cria ou atualiza a despesa.
+3. Os dados são salvos no navegador; a lista, resumo e gráfico são atualizados.
+4. Se inválido, o app informa os campos a corrigir sem alterar a despesa.
+5. Para editar, usuário carrega a despesa no formulário; para excluir, remove o lançamento da lista.
 
-### 6.2 Visualizar resumo
+### 6.2 Filtrar despesas
 
-1. Ao carregar a página, valores iniciais já estão no HTML (ex.: `R$ 0,00`); o TypeScript pode sincronizar na inicialização se necessário.
-2. A cada despesa adicionada, totais são recalculados e os nós correspondentes da sidebar são atualizados (`textContent` ou equivalente).
+1. Usuário seleciona um mês na sidebar e, opcionalmente, digita parte do título e/ou escolhe uma categoria.
+2. A lista, a contagem, os totais por categoria, o total geral e o gráfico exibem os resultados que atendem a todos os critérios.
+3. O CSV exporta apenas esses resultados; o backup permanece completo.
+4. Se nenhum lançamento corresponder, o app mostra o estado "Nenhuma despesa encontrada"; se não houver despesas cadastradas, mostra a orientação inicial.
+
+### 6.3 Acompanhar meta mensal
+
+1. Usuário define uma meta mensal na sidebar.
+2. A meta é salva no navegador e comparada aos gastos totais do mês em foco, sem ser afetada pelos filtros de título ou categoria.
 
 ---
 
@@ -252,16 +277,21 @@ A divisão em módulos extras é opcional; priorizar simplicidade. Funções pur
 
 - [ ] `npm run dev` inicia o app sem erros
 - [ ] `npm run build` conclui com sucesso (TypeScript + Vite)
-- [ ] Formulário adiciona despesa com id, título, valor e categoria válidos
-- [ ] Lista exibe todas as despesas da sessão
-- [ ] Sidebar mostra total geral correto
-- [ ] Sidebar mostra total correto para cada uma das 5 categorias
-- [ ] Recarregar a página zera os dados (sem persistência)
+- [ ] Formulário adiciona e edita despesa com id, título, valor, data e categoria válidos
+- [ ] Lista permite excluir despesas e persiste alterações no navegador
+- [ ] Busca por título parcial não diferencia acentos ou capitalização
+- [ ] Filtros de mês, categoria e título podem ser combinados e atualizam lista, contagem e resumo
+- [ ] Estado vazio diferencia ausência de despesas de ausência de resultados
+- [ ] Sidebar e gráfico mostram valores corretos para o conjunto filtrado
+- [ ] Meta mensal persiste e contabiliza os gastos do mês sem filtros de categoria ou título
+- [ ] CSV inclui apenas despesas visíveis; backup inclui todos os dados
+- [ ] Importação inválida ou cancelada preserva os dados atuais
+- [ ] Recarregar a página mantém despesas e meta salvas no navegador
 - [ ] Nenhum event handler inline no HTML
 - [ ] Estrutura da interface (sidebar, formulário, lista, estado vazio) definida em `index.html`, não montada inteira via TypeScript
 - [ ] TypeScript limita-se a estado, validação, eventos e atualização de elementos existentes / itens da lista
 - [ ] Tipos definidos em `src/types.ts`
-- [ ] Layout: sidebar à esquerda, card + lista à direita
+- [ ] Layout: sidebar à esquerda, card + lista e controles de filtro à direita
 
 ---
 

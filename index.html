@@ -264,10 +264,32 @@
             </div>
           </div>
           <p id="backup-status" class="backup-status" role="status" aria-live="polite"></p>
-          <p id="lista-vazia" class="empty-state">
+          <div class="expense-filters" aria-label="Filtros de despesas">
+            <div class="expense-filter">
+              <label for="filtro-texto">Buscar por título</label>
+              <input
+                id="filtro-texto"
+                type="search"
+                placeholder="Ex.: mercado"
+                autocomplete="off"
+              />
+            </div>
+            <div class="expense-filter">
+              <label for="filtro-categoria">Categoria</label>
+              <select id="filtro-categoria">
+                <option value="todas">Todas as categorias</option>
+                <option value="alimento">Alimento</option>
+                <option value="transporte">Transporte</option>
+                <option value="lazer">Lazer</option>
+                <option value="saúde">Saúde</option>
+                <option value="outros">Outros</option>
+              </select>
+            </div>
+          </div>
+          <p id="lista-vazia" class="empty-state" role="status" aria-live="polite">
             <span class="empty-mark" aria-hidden="true">—</span>
-            <span class="empty-title">Nada por aqui ainda</span>
-            <span class="empty-description"
+            <span id="lista-vazia-titulo" class="empty-title">Nada por aqui ainda</span>
+            <span id="lista-vazia-descricao" class="empty-description"
               >As despesas que você adicionar vão aparecer nesta lista.</span
             >
           </p>
