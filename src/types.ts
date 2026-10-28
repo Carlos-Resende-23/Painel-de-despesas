@@ -6,7 +6,10 @@ export const CATEGORIAS = [
   "outros",
 ] as const
 
+export const FREQUENCIAS = ["mensal", "trimestral", "anual"] as const
+
 export type Categoria = (typeof CATEGORIAS)[number]
+export type FrequenciaRecorrencia = (typeof FREQUENCIAS)[number]
 
 export type Despesa = {
   id: string
@@ -14,4 +17,6 @@ export type Despesa = {
   valor: number
   categoria: Categoria
   data?: string
+  recorrente?: boolean
+  frequencia?: FrequenciaRecorrencia
 }

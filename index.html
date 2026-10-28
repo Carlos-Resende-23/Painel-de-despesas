@@ -47,6 +47,13 @@
             </p>
           </div>
 
+          <div class="recurring-panel">
+            <p class="summary-label">Recorrentes</p>
+            <p id="recorrentes-status" class="summary-note">
+              Nenhuma despesa recorrente cadastrada.
+            </p>
+          </div>
+
           <div class="period-panel">
             <label for="mes-filtro">Período</label>
             <select id="mes-filtro" aria-label="Filtrar despesas por mês">
@@ -198,6 +205,26 @@
                   <option value="lazer">Lazer</option>
                   <option value="saúde">Saúde</option>
                   <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div class="field field-recorrente">
+                <label class="recorrente-toggle" for="despesa-recorrente">
+                  <input
+                    id="despesa-recorrente"
+                    name="despesa-recorrente"
+                    type="checkbox"
+                  />
+                  <span>Despesa recorrente</span>
+                </label>
+                <select
+                  id="frequencia-recorrencia"
+                  class="frequencia-recorrencia"
+                  aria-label="Frequência da despesa recorrente"
+                  hidden
+                >
+                  <option value="mensal">Mensal</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="anual">Anual</option>
                 </select>
               </div>
             </div>

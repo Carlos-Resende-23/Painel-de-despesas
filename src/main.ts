@@ -1,5 +1,11 @@
 import "./style.css"
-import { CATEGORIAS, type Categoria, type Despesa } from "./types.ts"
+import {
+  CATEGORIAS,
+  FREQUENCIAS,
+  type Categoria,
+  type Despesa,
+  type FrequenciaRecorrencia,
+} from "./types.ts"
 
 const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
 const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
@@ -50,6 +56,13 @@ function ehDespesa(valor: unknown): valor is Despesa {
   const dataValida =
     typeof registro.data !== "string" ||
     ehDataValida(registro.data)
+  const recorrenteValido =
+    typeof registro.recorrente === "undefined" ||
+    typeof registro.recorrente === "boolean"
+  const frequenciaValida =
+    typeof registro.frequencia === "undefined" ||
+    (typeof registro.frequencia === "string" &&
+      FREQUENCIAS.some((frequencia) => frequencia === registro.frequencia))
 
   return (
     typeof registro.id === "string" &&
@@ -59,7 +72,9 @@ function ehDespesa(valor: unknown): valor is Despesa {
     Number.isFinite(registro.valor) &&
     registro.valor > 0 &&
     CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
-    dataValida
+    dataValida &&
+    recorrenteValido &&
+    frequenciaValida
   )
 }
 
@@ -158,6 +173,15 @@ const inputMetaMensal = selecionarElemento<HTMLInputElement>("#meta-mensal")
 const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
   "#meta-mensal-status",
 )
+const checkboxDespesaRecorrente = selecionarElemento<HTMLInputElement>(
+  "#despesa-recorrente",
+)
+const frequenciaRecorrencia = selecionarElemento<HTMLSelectElement>(
+  "#frequencia-recorrencia",
+)
+const statusRecorrentes = selecionarElemento<HTMLParagraphElement>(
+  "#recorrentes-status",
+)
 const filtroMes = selecionarElemento<HTMLSelectElement>("#mes-filtro")
 const filtroTexto = selecionarElemento<HTMLInputElement>("#filtro-texto")
 const filtroCategoria =
@@ -182,6 +206,17 @@ const nomesCategoria: Record<Categoria, string> = {
   lazer: "Lazer",
   saúde: "Saúde",
   outros: "Outros",
+}
+
+function obterNomeFrequencia(frequencia?: string): string {
+  switch (frequencia) {
+    case "trimestral":
+      return "Trimestral"
+    case "anual":
+      return "Anual"
+    default:
+      return "Mensal"
+  }
 }
 
 function obterMesDaData(dataISO?: string): string {
@@ -330,10 +365,21 @@ function atualizarResumo(): void {
   const metaMensal = Number(inputMetaMensal.value || 0)
   const mesEmFoco =
     filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
+  const despesasRecorrentes = despesas.filter((despesa) => despesa.recorrente)
+  const totalRecorrente = despesasRecorrentes.reduce(
+    (soma, despesa) => soma + despesa.valor,
+    0,
+  )
 
   totalGeral.textContent = formatadorMoeda.format(total)
   quantidadeDespesas.textContent = `${despesasVisiveis.length} ${despesasVisiveis.length === 1 ? "despesa" : "despesas"} ${filtroMes.value === "todos" ? "no total" : `em ${formatarNomeMes(mesEmFoco)}`}`
   contadorLista.textContent = `${despesasVisiveis.length} ${despesasVisiveis.length === 1 ? "item" : "itens"}`
+
+  if (despesasRecorrentes.length === 0) {
+    statusRecorrentes.textContent = "Nenhuma despesa recorrente cadastrada."
+  } else {
+    statusRecorrentes.textContent = `${despesasRecorrentes.length} ${despesasRecorrentes.length === 1 ? "recorrente" : "recorrentes"} · ${formatadorMoeda.format(totalRecorrente)}`
+  }
 
   for (const categoria of CATEGORIAS) {
     const totalCategoria = despesasVisiveis
@@ -381,9 +427,18 @@ function salvarDespesas(): boolean {
   }
 }
 
+function atualizarVisibilidadeRecorrencia(): void {
+  const recorrente = checkboxDespesaRecorrente.checked
+  frequenciaRecorrencia.hidden = !recorrente
+  frequenciaRecorrencia.disabled = !recorrente
+}
+
 function limparFormulario(): void {
   form.reset()
   dataInput.value = obterDataISOlocal()
+  checkboxDespesaRecorrente.checked = false
+  frequenciaRecorrencia.value = "mensal"
+  atualizarVisibilidadeRecorrencia()
   despesaEmEdicaoId = null
   botaoSubmit.textContent = "Adicionar despesa"
   botaoCancelarEdicao.hidden = true
@@ -394,6 +449,9 @@ function preencherFormulario(despesa: Despesa): void {
   valorInput.value = String(despesa.valor)
   dataInput.value = obterDataParaFormulario(despesa.data)
   categoriaInput.value = despesa.categoria
+  checkboxDespesaRecorrente.checked = Boolean(despesa.recorrente)
+  frequenciaRecorrencia.value = despesa.frequencia ?? "mensal"
+  atualizarVisibilidadeRecorrencia()
 }
 
 function criarItemDespesa(despesa: Despesa): HTMLLIElement {
@@ -412,6 +470,12 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   categoria.className = "category-badge"
   categoria.dataset.category = despesa.categoria
   categoria.textContent = nomesCategoria[despesa.categoria]
+
+  const recorrencia = document.createElement("span")
+  recorrencia.className = "recurrence-badge"
+  recorrencia.textContent = despesa.recorrente
+    ? `Recorrente · ${obterNomeFrequencia(despesa.frequencia)}`
+    : "Única"
 
   const data = document.createElement("time")
   data.className = "expense-date"
@@ -464,7 +528,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
       : "Despesa excluída, mas não foi possível salvar a alteração neste navegador."
   })
 
-  detalhes.append(titulo, categoria, data)
+  detalhes.append(titulo, categoria, recorrencia, data)
   acoes.append(valor, botaoEditar, botaoExcluir)
   item.append(detalhes, acoes)
   return item
@@ -698,6 +762,10 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   const valor = Number(valorInput.value)
   const data = dataInput.value
   const categoriaSelecionada = categoriaInput.value
+  const recorrente = checkboxDespesaRecorrente.checked
+  const frequenciaSelecionada = recorrente
+    ? (frequenciaRecorrencia.value as FrequenciaRecorrencia)
+    : undefined
   const camposInvalidos: Array<HTMLInputElement | HTMLSelectElement> = []
 
   if (!titulo) camposInvalidos.push(tituloInput)
@@ -721,6 +789,8 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     valor,
     categoria: categoriaSelecionada as Categoria,
     data,
+    recorrente,
+    frequencia: recorrente ? frequenciaSelecionada : undefined,
   }
 
   if (despesaEmEdicaoId) {
@@ -731,6 +801,8 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesa.valor = valor
       despesa.categoria = categoriaSelecionada as Categoria
       despesa.data = data
+      despesa.recorrente = recorrente
+      despesa.frequencia = recorrente ? frequenciaSelecionada : undefined
     }
   } else {
     despesas.push(novaDespesa)
@@ -763,6 +835,7 @@ function atualizarDespesasFiltradas(): void {
   atualizarResumo()
 }
 
+checkboxDespesaRecorrente.addEventListener("change", atualizarVisibilidadeRecorrencia)
 filtroMes.addEventListener("change", atualizarDespesasFiltradas)
 filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
 filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
@@ -794,6 +867,7 @@ inputMetaMensal.addEventListener("input", () => {
 
 inputMetaMensal.value = String(carregarMetaMensal())
 
+atualizarVisibilidadeRecorrencia()
 atualizarListaMeses()
 renderizarLista()
 atualizarResumo()

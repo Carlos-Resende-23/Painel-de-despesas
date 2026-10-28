@@ -146,6 +146,7 @@ select {
 }
 
 .budget-panel,
+.recurring-panel,
 .period-panel {
   margin-top: 28px;
 }
@@ -502,6 +503,30 @@ h1 {
   color: #a0aaa2;
 }
 
+.field-recorrente {
+  justify-content: end;
+}
+
+.recorrente-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3c4c44;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.recorrente-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--pine);
+}
+
+.frequencia-recorrencia {
+  min-width: 120px;
+}
+
 .field input:focus,
 .field select:focus {
   border-color: #5f8c76;
@@ -836,6 +861,19 @@ h1 {
 }
 .category-badge[data-category="outros"] {
   background: #ebe7f3;
+}
+
+.recurrence-badge {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: #edf5ee;
+  color: #274a3b;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .expense-value {
