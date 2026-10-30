@@ -173,6 +173,18 @@ const inputMetaMensal = selecionarElemento<HTMLInputElement>("#meta-mensal")
 const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
   "#meta-mensal-status",
 )
+const progressoMetaMensal = selecionarElemento<HTMLDivElement>(
+  "#meta-mensal-progresso",
+)
+const barraMetaMensal = selecionarElemento<HTMLDivElement>(
+  "#meta-mensal-barra",
+)
+const preenchimentoMetaMensal = selecionarElemento<HTMLSpanElement>(
+  "#meta-mensal-preenchimento",
+)
+const percentualMetaMensal = selecionarElemento<HTMLSpanElement>(
+  "#meta-mensal-percentual",
+)
 const checkboxDespesaRecorrente = selecionarElemento<HTMLInputElement>(
   "#despesa-recorrente",
 )
@@ -406,6 +418,22 @@ function atualizarResumo(): void {
       .reduce((soma, despesa) => soma + despesa.valor, 0)
 
     const restante = metaMensal - totalMesMeta
+    const percentual = Math.round((totalMesMeta / metaMensal) * 100)
+    const percentualVisual = Math.min(percentual, 100)
+
+    progressoMetaMensal.hidden = false
+    preenchimentoMetaMensal.style.width = `${percentualVisual}%`
+    percentualMetaMensal.textContent = `${percentual}%`
+    barraMetaMensal.setAttribute("aria-valuenow", String(percentualVisual))
+    barraMetaMensal.setAttribute(
+      "aria-valuetext",
+      `${percentual}% da meta mensal utilizado`,
+    )
+    barraMetaMensal.classList.toggle(
+      "is-near",
+      percentual >= 80 && percentual < 100,
+    )
+    barraMetaMensal.classList.toggle("is-over", percentual >= 100)
 
     if (totalMesMeta <= metaMensal) {
       statusMetaMensal.textContent = `Você já gastou ${formatadorMoeda.format(totalMesMeta)} de ${formatadorMoeda.format(metaMensal)}. Faltam ${formatadorMoeda.format(restante)} para atingir a meta.`
@@ -413,6 +441,12 @@ function atualizarResumo(): void {
       statusMetaMensal.textContent = `Você ultrapassou a meta em ${formatadorMoeda.format(Math.abs(restante))}.`
     }
   } else {
+    progressoMetaMensal.hidden = true
+    preenchimentoMetaMensal.style.width = "0%"
+    percentualMetaMensal.textContent = "0%"
+    barraMetaMensal.setAttribute("aria-valuenow", "0")
+    barraMetaMensal.setAttribute("aria-valuetext", "0% da meta mensal utilizado")
+    barraMetaMensal.classList.remove("is-near", "is-over")
     statusMetaMensal.textContent =
       "Defina uma meta para acompanhar seu orçamento."
   }

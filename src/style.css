@@ -182,6 +182,52 @@ select {
   box-shadow: 0 0 0 3px rgba(217, 237, 114, 0.18);
 }
 
+.budget-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.budget-progress-row[hidden] {
+  display: none;
+}
+
+.budget-progress {
+  height: 7px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.budget-progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+  transition:
+    width 180ms ease,
+    background-color 180ms ease;
+}
+
+.budget-progress.is-near .budget-progress-fill {
+  background: var(--food);
+}
+
+.budget-progress.is-over .budget-progress-fill {
+  background: var(--coral);
+}
+
+.budget-progress-value {
+  min-width: 34px;
+  color: #dce6dc;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .period-panel {
   display: grid;
   gap: 8px;
