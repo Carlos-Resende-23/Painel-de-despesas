@@ -266,6 +266,32 @@
           </form>
         </section>
 
+        <section class="forecast-section" aria-labelledby="forecast-title">
+          <div class="forecast-heading">
+            <div>
+              <p class="eyebrow">Planejamento</p>
+              <h2 id="forecast-title">Próximos 6 meses</h2>
+            </div>
+            <p class="forecast-total">
+              Previsto: <strong id="previsao-total">R$ 0,00</strong>
+            </p>
+          </div>
+          <p class="forecast-description">
+            Uma estimativa das despesas recorrentes. Registre cada ocorrência
+            quando ela for paga.
+          </p>
+          <p id="previsao-vazia" class="forecast-empty" hidden>
+            Nenhuma despesa recorrente prevista para os próximos 6 meses.
+          </p>
+          <div id="previsao-lista" class="forecast-list"></div>
+          <p
+            id="previsao-status"
+            class="forecast-status"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </section>
+
         <section class="expenses-section" aria-labelledby="expenses-title">
           <div class="expenses-heading">
             <div>

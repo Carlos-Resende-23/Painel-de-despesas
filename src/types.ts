@@ -19,4 +19,5 @@ export type Despesa = {
   data?: string
   recorrente?: boolean
   frequencia?: FrequenciaRecorrencia
+  ocorrenciasRegistradas?: string[]
 }

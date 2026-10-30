@@ -63,6 +63,15 @@ function ehDespesa(valor: unknown): valor is Despesa {
     typeof registro.frequencia === "undefined" ||
     (typeof registro.frequencia === "string" &&
       FREQUENCIAS.some((frequencia) => frequencia === registro.frequencia))
+  const ocorrenciasRegistradasValidas =
+    typeof registro.ocorrenciasRegistradas === "undefined" ||
+    (Array.isArray(registro.ocorrenciasRegistradas) &&
+      registro.ocorrenciasRegistradas.every(
+        (data) =>
+          typeof data === "string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(data) &&
+          ehDataValida(data),
+      ))
 
   return (
     typeof registro.id === "string" &&
@@ -74,7 +83,8 @@ function ehDespesa(valor: unknown): valor is Despesa {
     CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
     dataValida &&
     recorrenteValido &&
-    frequenciaValida
+    frequenciaValida &&
+    ocorrenciasRegistradasValidas
   )
 }
 
@@ -204,6 +214,12 @@ const tituloListaVazia = selecionarElemento<HTMLSpanElement>(
 const descricaoListaVazia = selecionarElemento<HTMLSpanElement>(
   "#lista-vazia-descricao",
 )
+const previsaoTotal = selecionarElemento<HTMLElement>("#previsao-total")
+const previsaoLista = selecionarElemento<HTMLDivElement>("#previsao-lista")
+const previsaoVazia = selecionarElemento<HTMLParagraphElement>("#previsao-vazia")
+const previsaoStatus = selecionarElemento<HTMLParagraphElement>(
+  "#previsao-status",
+)
 
 let despesaEmEdicaoId: string | null = null
 
@@ -256,6 +272,169 @@ function formatarNomeMes(anoMes: string): string {
     month: "long",
     year: "numeric",
   })
+}
+
+type OcorrenciaPrevista = {
+  despesa: Despesa
+  data: string
+}
+
+function obterOcorrenciasPrevistas(): OcorrenciaPrevista[] {
+  const hoje = obterDataISOlocal()
+  const [anoAtual, mesAtual] = hoje.split("-").map(Number)
+  const mesAtualIndice = anoAtual * 12 + mesAtual - 1
+  const ocorrencias: OcorrenciaPrevista[] = []
+
+  for (const despesa of despesas) {
+    if (!despesa.recorrente) continue
+
+    const dataBase = obterDataParaFormulario(despesa.data)
+    const [anoBase, mesBase, diaBase] = dataBase.split("-").map(Number)
+    const mesBaseIndice = anoBase * 12 + mesBase - 1
+    const intervalo =
+      despesa.frequencia === "anual"
+        ? 12
+        : despesa.frequencia === "trimestral"
+          ? 3
+          : 1
+    const ocorrenciasRegistradas = new Set(
+      despesa.ocorrenciasRegistradas ?? [],
+    )
+
+    for (let deslocamento = 0; deslocamento < 6; deslocamento += 1) {
+      const indiceMes = mesAtualIndice + deslocamento
+      const mesesDesdeBase = indiceMes - mesBaseIndice
+      if (mesesDesdeBase <= 0 || mesesDesdeBase % intervalo !== 0) continue
+
+      const ano = Math.floor(indiceMes / 12)
+      const mes = indiceMes % 12
+      const ultimoDia = new Date(ano, mes + 1, 0).getDate()
+      const dia = Math.min(diaBase, ultimoDia)
+      const data = obterDataISOlocal(new Date(ano, mes, dia))
+
+      if (data >= hoje && !ocorrenciasRegistradas.has(data)) {
+        ocorrencias.push({ despesa, data })
+      }
+    }
+  }
+
+  return ocorrencias.sort(
+    (a, b) => a.data.localeCompare(b.data) ||
+      a.despesa.titulo.localeCompare(b.despesa.titulo, "pt-BR"),
+  )
+}
+
+function registrarOcorrencia(
+  despesa: Despesa,
+  data: string,
+): void {
+  const ocorrenciasAnteriores = despesa.ocorrenciasRegistradas
+  despesa.ocorrenciasRegistradas = [...(ocorrenciasAnteriores ?? []), data]
+  despesas.push({
+    id: crypto.randomUUID(),
+    titulo: despesa.titulo,
+    valor: despesa.valor,
+    categoria: despesa.categoria,
+    data,
+    recorrente: false,
+  })
+
+  if (!salvarDespesas()) {
+    despesas.pop()
+    if (ocorrenciasAnteriores) {
+      despesa.ocorrenciasRegistradas = ocorrenciasAnteriores
+    } else {
+      delete despesa.ocorrenciasRegistradas
+    }
+    previsaoStatus.textContent =
+      "Não foi possível registrar a ocorrência. Os dados não foram alterados."
+    return
+  }
+
+  atualizarListaMeses()
+  renderizarLista()
+  atualizarResumo()
+  previsaoStatus.textContent =
+    `${despesa.titulo} registrada em ${formatarData(data)}.`
+}
+
+function renderizarPrevisao(): void {
+  const ocorrencias = obterOcorrenciasPrevistas()
+  const total = ocorrencias.reduce(
+    (soma, ocorrencia) => soma + ocorrencia.despesa.valor,
+    0,
+  )
+  previsaoTotal.textContent = formatadorMoeda.format(total)
+  previsaoLista.innerHTML = ""
+  previsaoVazia.hidden = ocorrencias.length > 0
+
+  const ocorrenciasPorMes = new Map<string, OcorrenciaPrevista[]>()
+  for (const ocorrencia of ocorrencias) {
+    const mes = ocorrencia.data.slice(0, 7)
+    const grupo = ocorrenciasPorMes.get(mes) ?? []
+    grupo.push(ocorrencia)
+    ocorrenciasPorMes.set(mes, grupo)
+  }
+
+  for (const [mes, itens] of ocorrenciasPorMes) {
+    const grupo = document.createElement("section")
+    grupo.className = "forecast-month"
+    grupo.setAttribute("aria-label", formatarNomeMes(mes))
+
+    const cabecalhoMes = document.createElement("div")
+    cabecalhoMes.className = "forecast-month-header"
+
+    const tituloMes = document.createElement("h3")
+    tituloMes.className = "forecast-month-title"
+    tituloMes.textContent = formatarNomeMes(mes)
+
+    const totalMes = document.createElement("strong")
+    totalMes.className = "forecast-month-total"
+    totalMes.textContent = formatadorMoeda.format(
+      itens.reduce((soma, item) => soma + item.despesa.valor, 0),
+    )
+    cabecalhoMes.append(tituloMes, totalMes)
+    grupo.append(cabecalhoMes)
+
+    for (const ocorrencia of itens) {
+      const linha = document.createElement("div")
+      linha.className = "forecast-item"
+
+      const detalhes = document.createElement("div")
+      detalhes.className = "forecast-details"
+
+      const titulo = document.createElement("strong")
+      titulo.className = "forecast-item-title"
+      titulo.textContent = ocorrencia.despesa.titulo
+
+      const info = document.createElement("span")
+      info.className = "forecast-item-info"
+      info.textContent =
+        `${formatarData(ocorrencia.data)} · ${nomesCategoria[ocorrencia.despesa.categoria]}`
+
+      const valor = document.createElement("span")
+      valor.className = "forecast-item-value"
+      valor.textContent = formatadorMoeda.format(ocorrencia.despesa.valor)
+
+      const botaoRegistrar = document.createElement("button")
+      botaoRegistrar.className = "forecast-register"
+      botaoRegistrar.type = "button"
+      botaoRegistrar.textContent = "Registrar pagamento"
+      botaoRegistrar.setAttribute(
+        "aria-label",
+        `Registrar ${ocorrencia.despesa.titulo} de ${formatadorMoeda.format(ocorrencia.despesa.valor)} em ${formatarData(ocorrencia.data)}`,
+      )
+      botaoRegistrar.addEventListener("click", () => {
+        registrarOcorrencia(ocorrencia.despesa, ocorrencia.data)
+      })
+
+      detalhes.append(titulo, info)
+      linha.append(detalhes, valor, botaoRegistrar)
+      grupo.append(linha)
+    }
+
+    previsaoLista.append(grupo)
+  }
 }
 
 function obterDespesasVisiveis(): Despesa[] {
@@ -570,6 +749,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
 
 function renderizarLista(): void {
   const despesasVisiveis = obterDespesasVisiveis()
+  renderizarPrevisao()
   listaDespesas.innerHTML = ""
   botaoExportar.disabled = despesasVisiveis.length === 0
 

@@ -4,11 +4,13 @@ Painel de despesas desenvolvido com Vite e TypeScript.
 
 As despesas e a meta mensal são salvas no navegador. Também é possível marcar
 lançamentos como **recorrentes** (mensal, trimestral ou anual), e o painel
-exibe um resumo dos valores recorrentes cadastrados. Para transferir ou
-proteger esses dados, use **Exportar backup** para baixar um arquivo JSON e
-**Importar backup** para restaurá-lo. A importação substitui os dados atuais
-após confirmação; o CSV continua disponível para exportar despesas para
-planilhas.
+exibe um resumo dos valores recorrentes cadastrados e uma previsão para os
+próximos seis meses. A previsão não altera os gastos realizados: use
+**Registrar pagamento** quando uma ocorrência for paga para adicioná-la à
+lista sem duplicá-la. Para transferir ou proteger esses dados, use
+**Exportar backup** para baixar um arquivo JSON e **Importar backup** para
+restaurá-lo. A importação substitui os dados atuais após confirmação; o CSV
+continua disponível para exportar despesas para planilhas.
 
 ## GitHub Pages
 
