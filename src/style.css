@@ -828,6 +828,98 @@ h1 {
   color: #335343;
 }
 
+.trend-section {
+  margin-top: 20px;
+  padding: 22px 24px;
+  border: 1px solid #dfe5dd;
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.trend-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.trend-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.trend-heading .eyebrow {
+  margin-bottom: 5px;
+}
+
+.trend-comparison,
+.trend-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.trend-comparison {
+  max-width: 55%;
+  color: #335343;
+  text-align: right;
+}
+
+.trend-description {
+  margin-top: 8px;
+}
+
+.trend-chart {
+  display: grid;
+  gap: 11px;
+  margin-top: 19px;
+}
+
+.trend-row {
+  display: grid;
+  grid-template-columns: 67px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.trend-label {
+  color: #53675d;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.trend-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #edf1ec;
+}
+
+.trend-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #9db8a6;
+  transition: width 180ms ease;
+}
+
+.trend-bar.is-current {
+  background: var(--pine);
+}
+
+.trend-value {
+  min-width: 88px;
+  color: #344b3e;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .expenses-section {
   margin-top: 43px;
 }
@@ -1266,6 +1358,32 @@ h1 {
   .forecast-section {
     margin-top: 29px;
     padding: 19px 16px;
+  }
+
+  .trend-section {
+    margin-top: 16px;
+    padding: 19px 16px;
+  }
+
+  .trend-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trend-comparison {
+    max-width: none;
+    text-align: left;
+  }
+
+  .trend-row {
+    grid-template-columns: 51px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .trend-value {
+    min-width: 78px;
+    font-size: 10px;
   }
 
   .forecast-heading {

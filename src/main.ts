@@ -220,6 +220,9 @@ const previsaoVazia = selecionarElemento<HTMLParagraphElement>("#previsao-vazia"
 const previsaoStatus = selecionarElemento<HTMLParagraphElement>(
   "#previsao-status",
 )
+const graficoEvolucao = selecionarElemento<HTMLDivElement>("#grafico-evolucao")
+const comparacaoEvolucao =
+  selecionarElemento<HTMLParagraphElement>("#trend-comparison")
 
 let despesaEmEdicaoId: string | null = null
 
@@ -547,6 +550,86 @@ function atualizarGraficoCategorias(despesasVisiveis: Despesa[]): void {
   }
 }
 
+function atualizarGraficoEvolucao(): void {
+  const hoje = new Date()
+  const meses = Array.from({ length: 6 }, (_, indice) => {
+    const data = new Date(hoje.getFullYear(), hoje.getMonth() - 5 + indice, 1)
+    return {
+      data,
+      chave: obterDataISOlocal(data).slice(0, 7),
+      total: 0,
+    }
+  })
+  const totaisPorMes = new Map(meses.map((mes) => [mes.chave, mes]))
+
+  for (const despesa of despesas) {
+    const mes = totaisPorMes.get(obterMesDaData(despesa.data))
+    if (mes) mes.total += despesa.valor
+  }
+
+  const maiorTotal = Math.max(...meses.map((mes) => mes.total), 0)
+  graficoEvolucao.innerHTML = ""
+
+  for (const [indice, mes] of meses.entries()) {
+    const linha = document.createElement("div")
+    linha.className = "trend-row"
+    linha.setAttribute("role", "listitem")
+    linha.setAttribute(
+      "aria-label",
+      `${formatarNomeMes(mes.chave)}: ${formatadorMoeda.format(mes.total)}`,
+    )
+
+    const rotulo = document.createElement("span")
+    rotulo.className = "trend-label"
+    rotulo.textContent =
+      `${mes.data.toLocaleDateString("pt-BR", { month: "short" }).replace(/\.$/, "")}/${String(mes.data.getFullYear()).slice(-2)}`
+
+    const trilha = document.createElement("div")
+    trilha.className = "trend-track"
+    trilha.setAttribute("aria-hidden", "true")
+
+    const barra = document.createElement("span")
+    barra.className = "trend-bar"
+    barra.style.width =
+      maiorTotal > 0 ? `${(mes.total / maiorTotal) * 100}%` : "0%"
+    if (indice === meses.length - 1) barra.classList.add("is-current")
+    trilha.append(barra)
+
+    const valor = document.createElement("strong")
+    valor.className = "trend-value"
+    valor.textContent = formatadorMoeda.format(mes.total)
+
+    linha.append(rotulo, trilha, valor)
+    graficoEvolucao.append(linha)
+  }
+
+  const mesAtual = meses[meses.length - 1]
+  const mesAnterior = meses[meses.length - 2]
+  if (!mesAtual || !mesAnterior) return
+
+  const nomeMesAnterior = formatarNomeMes(mesAnterior.chave)
+  if (mesAtual.total === mesAnterior.total) {
+    comparacaoEvolucao.textContent =
+      mesAtual.total === 0
+        ? "Sem gastos registrados nos dois últimos meses."
+        : `Mesmo valor de ${nomeMesAnterior}.`
+    return
+  }
+
+  if (mesAnterior.total === 0) {
+    comparacaoEvolucao.textContent =
+      `Sem gastos em ${nomeMesAnterior}; ${formatadorMoeda.format(mesAtual.total)} no mês atual.`
+    return
+  }
+
+  const diferenca = Math.abs(mesAtual.total - mesAnterior.total)
+  const percentual = Number(((diferenca / mesAnterior.total) * 100).toFixed(1))
+  const direcao = mesAtual.total > mesAnterior.total ? "Aumento" : "Queda"
+  const detalhePercentual = percentual > 0 ? ` (${percentual}%)` : ""
+  comparacaoEvolucao.textContent =
+    `${direcao} de ${formatadorMoeda.format(diferenca)}${detalhePercentual} em relação a ${nomeMesAnterior}.`
+}
+
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   const total = despesasVisiveis.reduce(
@@ -586,6 +669,7 @@ function atualizarResumo(): void {
   }
 
   atualizarGraficoCategorias(despesasVisiveis)
+  atualizarGraficoEvolucao()
 
   if (metaMensal > 0) {
     const totalMesMeta = despesas
