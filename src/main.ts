@@ -5,10 +5,12 @@ import {
   type Categoria,
   type Despesa,
   type FrequenciaRecorrencia,
+  type LimitesCategoria,
 } from "./types.ts"
 
 const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
 const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
+const CHAVE_LIMITES_CATEGORIA = "painel-despesas:limites-categoria:v1"
 
 function obterDataISOlocal(data = new Date()): string {
   const ano = data.getFullYear()
@@ -139,7 +141,43 @@ function salvarMetaMensal(valor: number): boolean {
   }
 }
 
+function ehLimitesCategoria(valor: unknown): valor is LimitesCategoria {
+  if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
+    return false
+  }
+
+  return Object.entries(valor).every(
+    ([categoria, limite]) =>
+      CATEGORIAS.some((item) => item === categoria) &&
+      typeof limite === "number" &&
+      Number.isFinite(limite) &&
+      limite > 0,
+  )
+}
+
+function carregarLimitesCategoria(): LimitesCategoria {
+  try {
+    const dados = localStorage.getItem(CHAVE_LIMITES_CATEGORIA)
+    if (!dados) return {}
+
+    const limites: unknown = JSON.parse(dados)
+    return ehLimitesCategoria(limites) ? limites : {}
+  } catch {
+    return {}
+  }
+}
+
+function salvarLimitesCategoria(limites: LimitesCategoria): boolean {
+  try {
+    localStorage.setItem(CHAVE_LIMITES_CATEGORIA, JSON.stringify(limites))
+    return true
+  } catch {
+    return false
+  }
+}
+
 const despesas: Despesa[] = carregarDespesas()
+let limitesCategoria: LimitesCategoria = carregarLimitesCategoria()
 
 function selecionarElemento<T extends Element>(seletor: string): T {
   const elemento = document.querySelector<T>(seletor)
@@ -176,6 +214,12 @@ const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
 const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
 const chartCategorias = selecionarElemento<HTMLDivElement>("#grafico-categorias")
 const chartCaption = selecionarElemento<HTMLSpanElement>("#chart-caption")
+const listaLimitesCategoria = selecionarElemento<HTMLDivElement>(
+  "#orcamentos-categoria",
+)
+const statusLimitesCategoria = selecionarElemento<HTMLParagraphElement>(
+  "#orcamentos-status",
+)
 const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
 const botaoCancelarEdicao =
   selecionarElemento<HTMLButtonElement>("#cancelar-edicao")
@@ -630,6 +674,154 @@ function atualizarGraficoEvolucao(): void {
     `${direcao} de ${formatadorMoeda.format(diferenca)}${detalhePercentual} em relação a ${nomeMesAnterior}.`
 }
 
+function inicializarLimitesCategoria(): void {
+  for (const categoria of CATEGORIAS) {
+    const item = document.createElement("div")
+    item.className = "category-budget"
+
+    const cabecalho = document.createElement("div")
+    cabecalho.className = "category-budget-header"
+
+    const nome = document.createElement("label")
+    nome.className = "category-budget-name"
+    nome.htmlFor = `limite-${categoria}`
+    nome.textContent = nomesCategoria[categoria]
+
+    const valorInput = document.createElement("input")
+    valorInput.id = `limite-${categoria}`
+    valorInput.className = "category-budget-input"
+    valorInput.type = "number"
+    valorInput.min = "0"
+    valorInput.step = "0.01"
+    valorInput.inputMode = "decimal"
+    valorInput.placeholder = "Sem limite"
+    valorInput.dataset.categoria = categoria
+    valorInput.setAttribute(
+      "aria-label",
+      `Limite mensal para ${nomesCategoria[categoria]} em reais`,
+    )
+    valorInput.value = String(limitesCategoria[categoria] ?? "")
+    cabecalho.append(nome, valorInput)
+
+    const progressoLinha = document.createElement("div")
+    progressoLinha.className = "category-budget-progress-row"
+    progressoLinha.dataset.progressoCategoria = categoria
+
+    const barra = document.createElement("div")
+    barra.className = "category-budget-progress"
+    barra.setAttribute("role", "progressbar")
+    barra.setAttribute("aria-label", `Uso do limite de ${nomesCategoria[categoria]}`)
+    barra.setAttribute("aria-valuemin", "0")
+    barra.setAttribute("aria-valuemax", "100")
+    barra.setAttribute("aria-valuenow", "0")
+
+    const preenchimento = document.createElement("span")
+    preenchimento.className = "category-budget-progress-fill"
+    barra.append(preenchimento)
+
+    const percentual = document.createElement("span")
+    percentual.className = "category-budget-percent"
+    progressoLinha.append(barra, percentual)
+
+    const status = document.createElement("p")
+    status.className = "category-budget-status"
+    status.dataset.statusCategoria = categoria
+
+    item.append(cabecalho, progressoLinha, status)
+    listaLimitesCategoria.append(item)
+  }
+}
+
+function atualizarLimitesCategoria(mes: string): void {
+  for (const categoria of CATEGORIAS) {
+    const total = despesas
+      .filter(
+        (despesa) =>
+          despesa.categoria === categoria &&
+          obterMesDaData(despesa.data ?? obterDataISOlocal()) === mes,
+      )
+      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const limite = limitesCategoria[categoria] ?? 0
+    const input = listaLimitesCategoria.querySelector<HTMLInputElement>(
+      `[data-categoria="${categoria}"]`,
+    )
+    const progressoLinha = listaLimitesCategoria.querySelector<HTMLDivElement>(
+      `[data-progresso-categoria="${categoria}"]`,
+    )
+    const barra = progressoLinha?.querySelector<HTMLDivElement>(
+      ".category-budget-progress",
+    )
+    const preenchimento = progressoLinha?.querySelector<HTMLSpanElement>(
+      ".category-budget-progress-fill",
+    )
+    const percentualElemento =
+      progressoLinha?.querySelector<HTMLSpanElement>(
+        ".category-budget-percent",
+      )
+    const status = listaLimitesCategoria.querySelector<HTMLParagraphElement>(
+      `[data-status-categoria="${categoria}"]`,
+    )
+
+    if (input && document.activeElement !== input) {
+      input.value = limite > 0 ? String(limite) : ""
+    }
+
+    if (
+      !progressoLinha ||
+      !barra ||
+      !preenchimento ||
+      !percentualElemento ||
+      !status
+    ) {
+      continue
+    }
+
+    if (limite <= 0) {
+      progressoLinha.hidden = true
+      barra.setAttribute("aria-valuenow", "0")
+      preenchimento.style.width = "0%"
+      barra.classList.remove("is-near", "is-over")
+      status.textContent = "Defina um limite mensal."
+      status.classList.remove("is-near", "is-over")
+      continue
+    }
+
+    const percentualPreciso = (total / limite) * 100
+    const percentual = Math.round(percentualPreciso)
+    progressoLinha.hidden = false
+    preenchimento.style.width = `${Math.min(percentualPreciso, 100)}%`
+    percentualElemento.textContent = `${percentual}%`
+    barra.setAttribute(
+      "aria-valuenow",
+      String(Math.min(percentual, 100)),
+    )
+    barra.setAttribute(
+      "aria-valuetext",
+      `${percentual}% do limite utilizado`,
+    )
+    barra.classList.toggle(
+      "is-near",
+      percentualPreciso >= 80 && percentualPreciso < 100,
+    )
+    barra.classList.toggle("is-over", percentualPreciso >= 100)
+    status.classList.toggle(
+      "is-near",
+      percentualPreciso >= 80 && percentualPreciso < 100,
+    )
+    status.classList.toggle("is-over", percentualPreciso >= 100)
+
+    if (total > limite) {
+      status.textContent =
+        `Limite ultrapassado em ${formatadorMoeda.format(total - limite)}.`
+    } else if (total === limite) {
+      status.textContent = "Limite atingido."
+    } else {
+      status.textContent =
+        `${formatadorMoeda.format(total)} de ${formatadorMoeda.format(limite)} · restam ${formatadorMoeda.format(limite - total)}.`
+    }
+  }
+}
+
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   const total = despesasVisiveis.reduce(
@@ -670,6 +862,7 @@ function atualizarResumo(): void {
 
   atualizarGraficoCategorias(despesasVisiveis)
   atualizarGraficoEvolucao()
+  atualizarLimitesCategoria(mesEmFoco)
 
   if (metaMensal > 0) {
     const totalMesMeta = despesas
@@ -893,6 +1086,7 @@ function exportarBackup(): void {
     exportadoEm: new Date().toISOString(),
     despesas,
     metaMensal: Number(inputMetaMensal.value || 0),
+    limitesCategoria,
   }
   const arquivo = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json;charset=utf-8",
@@ -913,6 +1107,7 @@ function ehBackup(valor: unknown): valor is {
   versao: 1
   despesas: Despesa[]
   metaMensal: number
+  limitesCategoria?: LimitesCategoria
 } {
   if (typeof valor !== "object" || valor === null) return false
 
@@ -923,7 +1118,9 @@ function ehBackup(valor: unknown): valor is {
     !Array.isArray(backup.despesas) ||
     typeof backup.metaMensal !== "number" ||
     !Number.isFinite(backup.metaMensal) ||
-    backup.metaMensal < 0
+    backup.metaMensal < 0 ||
+    (typeof backup.limitesCategoria !== "undefined" &&
+      !ehLimitesCategoria(backup.limitesCategoria))
   ) {
     return false
   }
@@ -961,24 +1158,33 @@ function restaurarValorArmazenado(chave: string, valor: string | null): boolean 
 function salvarBackupImportado(backup: {
   despesas: Despesa[]
   metaMensal: number
+  limitesCategoria?: LimitesCategoria
 }): "salvo" | "falhou" | "falhou-parcial" {
   let despesasAnteriores: string | null
   let metaAnterior: string | null
+  let limitesAnteriores: string | null
 
   try {
     despesasAnteriores = localStorage.getItem(CHAVE_ARMAZENAMENTO)
     metaAnterior = localStorage.getItem(CHAVE_META_MENSAL)
+    limitesAnteriores = localStorage.getItem(CHAVE_LIMITES_CATEGORIA)
   } catch {
     return "falhou"
   }
 
   let despesasGravadas = false
   let metaGravada = false
+  let limitesGravados = false
   try {
     localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(backup.despesas))
     despesasGravadas = true
     localStorage.setItem(CHAVE_META_MENSAL, String(backup.metaMensal))
     metaGravada = true
+    localStorage.setItem(
+      CHAVE_LIMITES_CATEGORIA,
+      JSON.stringify(backup.limitesCategoria ?? {}),
+    )
+    limitesGravados = true
     return "salvo"
   } catch {
     const despesasRestauradas =
@@ -986,7 +1192,12 @@ function salvarBackupImportado(backup: {
       restaurarValorArmazenado(CHAVE_ARMAZENAMENTO, despesasAnteriores)
     const metaRestaurada =
       !metaGravada || restaurarValorArmazenado(CHAVE_META_MENSAL, metaAnterior)
-    return despesasRestauradas && metaRestaurada ? "falhou" : "falhou-parcial"
+    const limitesRestaurados =
+      !limitesGravados ||
+      restaurarValorArmazenado(CHAVE_LIMITES_CATEGORIA, limitesAnteriores)
+    return despesasRestauradas && metaRestaurada && limitesRestaurados
+      ? "falhou"
+      : "falhou-parcial"
   }
 }
 
@@ -1013,7 +1224,7 @@ async function importarBackup(arquivo: File): Promise<void> {
   const quantidadeAtual = `${despesas.length} ${despesas.length === 1 ? "despesa atual" : "despesas atuais"}`
   const quantidadeBackup = `${backup.despesas.length} ${backup.despesas.length === 1 ? "despesa" : "despesas"}`
   const confirmou = window.confirm(
-    `Este backup substituirá ${quantidadeAtual} por ${quantidadeBackup} e atualizará a meta mensal. Deseja continuar?`,
+    `Este backup substituirá ${quantidadeAtual} por ${quantidadeBackup} e atualizará a meta mensal e os limites por categoria. Deseja continuar?`,
   )
   if (!confirmou) {
     statusBackup.textContent = "Importação cancelada."
@@ -1032,6 +1243,7 @@ async function importarBackup(arquivo: File): Promise<void> {
   despesas.splice(0, despesas.length)
   backup.despesas.forEach((despesa) => despesas.push({ ...despesa }))
   inputMetaMensal.value = String(backup.metaMensal)
+  limitesCategoria = { ...(backup.limitesCategoria ?? {}) }
   limparFormulario()
   atualizarListaMeses()
   renderizarLista()
@@ -1134,6 +1346,42 @@ function atualizarDespesasFiltradas(): void {
 }
 
 checkboxDespesaRecorrente.addEventListener("change", atualizarVisibilidadeRecorrencia)
+listaLimitesCategoria.addEventListener("input", (evento: Event) => {
+  const input = evento.target
+  if (!(input instanceof HTMLInputElement)) return
+
+  const categoria = CATEGORIAS.find(
+    (item) => item === input.dataset.categoria,
+  )
+  if (!categoria) return
+
+  const limite = input.value === "" ? 0 : Number(input.value)
+  if (!Number.isFinite(limite) || limite < 0) return
+
+  const limiteAnterior = limitesCategoria[categoria]
+  if (limite > 0) {
+    limitesCategoria[categoria] = limite
+  } else {
+    delete limitesCategoria[categoria]
+  }
+
+  if (!salvarLimitesCategoria(limitesCategoria)) {
+    if (typeof limiteAnterior === "number") {
+      limitesCategoria[categoria] = limiteAnterior
+      input.value = String(limiteAnterior)
+    } else {
+      delete limitesCategoria[categoria]
+      input.value = ""
+    }
+    statusLimitesCategoria.textContent =
+      "Não foi possível salvar o limite neste navegador."
+    atualizarResumo()
+    return
+  }
+
+  statusLimitesCategoria.textContent = "Limites salvos neste navegador."
+  atualizarResumo()
+})
 filtroMes.addEventListener("change", atualizarDespesasFiltradas)
 filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
 filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
@@ -1165,6 +1413,7 @@ inputMetaMensal.addEventListener("input", () => {
 
 inputMetaMensal.value = String(carregarMetaMensal())
 
+inicializarLimitesCategoria()
 atualizarVisibilidadeRecorrencia()
 atualizarListaMeses()
 renderizarLista()

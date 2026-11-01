@@ -260,6 +260,7 @@ select {
 }
 
 .category-summary h3,
+.category-budgets h3,
 .chart-header h3 {
   margin: 0 0 13px;
   color: #dce6dc;
@@ -285,6 +286,131 @@ select {
   color: #f1f3ea;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.category-budgets {
+  margin-top: 25px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.category-budgets h3 {
+  margin-bottom: 5px;
+}
+
+.category-budgets-description,
+.category-budgets-status {
+  margin: 0;
+  color: #a9c0b1;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.category-budget-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.category-budget {
+  display: grid;
+  gap: 5px;
+}
+
+.category-budget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.category-budget-name {
+  color: #eef4ee;
+  font-size: 10px;
+}
+
+.category-budget-input {
+  width: 92px;
+  height: 29px;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  outline: none;
+  color: #f4f5ec;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.category-budget-input::placeholder {
+  color: #a9c0b1;
+}
+
+.category-budget-input:focus {
+  border-color: rgba(217, 237, 114, 0.8);
+  box-shadow: 0 0 0 3px rgba(217, 237, 114, 0.18);
+}
+
+.category-budget-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.category-budget-progress-row[hidden] {
+  display: none;
+}
+
+.category-budget-progress {
+  height: 5px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.category-budget-progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+  transition:
+    width 180ms ease,
+    background-color 180ms ease;
+}
+
+.category-budget-progress.is-near .category-budget-progress-fill {
+  background: var(--food);
+}
+
+.category-budget-progress.is-over .category-budget-progress-fill {
+  background: var(--coral);
+}
+
+.category-budget-percent {
+  min-width: 29px;
+  color: #dce6dc;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.category-budget-status {
+  font-size: 9px;
+}
+
+.category-budget-status.is-near {
+  color: var(--food);
+}
+
+.category-budget-status.is-over {
+  color: #f19a81;
+}
+
+.category-budgets-status {
+  min-height: 14px;
+  margin-top: 10px;
 }
 
 .chart-panel {
@@ -1287,6 +1413,10 @@ h1 {
 
   .category-summary {
     margin-top: 22px;
+  }
+
+  .category-budgets {
+    margin-top: 20px;
   }
 
   .category-totals {

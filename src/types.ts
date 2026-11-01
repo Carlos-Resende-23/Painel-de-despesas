@@ -10,6 +10,7 @@ export const FREQUENCIAS = ["mensal", "trimestral", "anual"] as const
 
 export type Categoria = (typeof CATEGORIAS)[number]
 export type FrequenciaRecorrencia = (typeof FREQUENCIAS)[number]
+export type LimitesCategoria = Partial<Record<Categoria, number>>
 
 export type Despesa = {
   id: string
