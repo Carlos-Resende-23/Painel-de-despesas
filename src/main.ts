@@ -212,6 +212,9 @@ const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
 )
 const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
+const alertasFinanceiros = selecionarElemento<HTMLUListElement>(
+  "#alertas-financeiros",
+)
 const chartCategorias = selecionarElemento<HTMLDivElement>("#grafico-categorias")
 const chartCaption = selecionarElemento<HTMLSpanElement>("#chart-caption")
 const listaLimitesCategoria = selecionarElemento<HTMLDivElement>(
@@ -822,6 +825,132 @@ function atualizarLimitesCategoria(mes: string): void {
   }
 }
 
+function atualizarAlertas(): void {
+  const mesEmFoco =
+    filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
+  const despesasMes = despesas.filter(
+    (despesa) =>
+      obterMesDaData(despesa.data ?? new Date().toISOString()) === mesEmFoco,
+  )
+  const totalMes = despesasMes.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const metaMensal = Number(inputMetaMensal.value || 0)
+  const hoje = new Date()
+  const mesAtual = obterDataISOlocal().slice(0, 7)
+  const alertas: Array<{ nivel: "alerta" | "warning" | "sucesso"; titulo: string; texto: string }> = []
+
+  if (metaMensal > 0) {
+    const restante = metaMensal - totalMes
+    if (mesEmFoco === mesAtual) {
+      const ultimoDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+      const diasRestantes = Math.max(ultimoDiaDoMes.getDate() - hoje.getDate(), 1)
+      const gastoDiario = totalMes / Math.max(hoje.getDate(), 1)
+      const projecao = gastoDiario * ultimoDiaDoMes.getDate()
+
+      if (totalMes <= metaMensal) {
+        const gastoMaximoPorDia = restante / diasRestantes
+        alertas.push({
+          nivel: restante <= metaMensal * 0.15 ? "warning" : "sucesso",
+          titulo: "Meta em andamento",
+          texto: `Faltam ${formatadorMoeda.format(restante)} para atingir a meta. Para manter o orçamento, você pode gastar até ${formatadorMoeda.format(gastoMaximoPorDia)} por dia nos próximos ${diasRestantes} dias.`,
+        })
+      } else {
+        alertas.push({
+          nivel: "alerta",
+          titulo: "Meta em risco",
+          texto: `Você ultrapassou a meta em ${formatadorMoeda.format(Math.abs(restante))}. Se mantiver este ritmo, poderá fechar o mês em ${formatadorMoeda.format(projecao)}.`,
+        })
+      }
+    } else {
+      if (totalMes <= metaMensal) {
+        alertas.push({
+          nivel: "sucesso",
+          titulo: "Meta do mês",
+          texto: `${formatarNomeMes(mesEmFoco)} fechou com ${formatadorMoeda.format(totalMes)} de ${formatadorMoeda.format(metaMensal)}.`,
+        })
+      } else {
+        alertas.push({
+          nivel: "alerta",
+          titulo: "Meta do mês",
+          texto: `${formatarNomeMes(mesEmFoco)} excedeu a meta em ${formatadorMoeda.format(Math.abs(metaMensal - totalMes))}.`,
+        })
+      }
+    }
+  }
+
+  for (const categoria of CATEGORIAS) {
+    const limite = limitesCategoria[categoria] ?? 0
+    if (limite <= 0) continue
+
+    const totalCategoria = despesasMes
+      .filter((despesa) => despesa.categoria === categoria)
+      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const percentual = (totalCategoria / limite) * 100
+
+    if (percentual >= 100) {
+      alertas.push({
+        nivel: "alerta",
+        titulo: `${nomesCategoria[categoria]} ultrapassou o limite`,
+        texto: `Você gastou ${formatadorMoeda.format(totalCategoria)} de ${formatadorMoeda.format(limite)} neste mês.`,
+      })
+      break
+    }
+
+    if (percentual >= 80) {
+      alertas.push({
+        nivel: "warning",
+        titulo: `${nomesCategoria[categoria]} perto do limite`,
+        texto: `Já usou ${Math.round(percentual)}% do limite mensal de ${formatadorMoeda.format(limite)}.`,
+      })
+    }
+  }
+
+  const recorrentesPrevistos = obterOcorrenciasPrevistas().reduce(
+    (soma, ocorrencia) => soma + ocorrencia.despesa.valor,
+    0,
+  )
+  if (recorrentesPrevistos > 0) {
+    alertas.push({
+      nivel: "sucesso",
+      titulo: "Próximos 6 meses",
+      texto: `Há ${formatadorMoeda.format(recorrentesPrevistos)} em despesas recorrentes previstas.`,
+    })
+  }
+
+  alertasFinanceiros.innerHTML = ""
+
+  if (alertas.length === 0) {
+    const item = document.createElement("li")
+    item.className = "insight-item insight-sucesso"
+    const texto = document.createElement("span")
+    texto.textContent = "Tudo em ordem por enquanto. Continue acompanhando o mês."
+    item.append(texto)
+    alertasFinanceiros.append(item)
+    return
+  }
+
+  for (const alerta of alertas.slice(0, 3)) {
+    const item = document.createElement("li")
+    item.className = `insight-item insight-${alerta.nivel}`
+
+    const icone = document.createElement("span")
+    icone.className = "insight-icon"
+    icone.textContent = alerta.nivel === "alerta" ? "!" : alerta.nivel === "warning" ? "•" : "✓"
+
+    const conteudo = document.createElement("div")
+    conteudo.className = "insight-content"
+
+    const titulo = document.createElement("strong")
+    titulo.textContent = alerta.titulo
+
+    const texto = document.createElement("span")
+    texto.textContent = alerta.texto
+
+    conteudo.append(titulo, texto)
+    item.append(icone, conteudo)
+    alertasFinanceiros.append(item)
+  }
+}
+
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   const total = despesasVisiveis.reduce(
@@ -863,6 +992,7 @@ function atualizarResumo(): void {
   atualizarGraficoCategorias(despesasVisiveis)
   atualizarGraficoEvolucao()
   atualizarLimitesCategoria(mesEmFoco)
+  atualizarAlertas()
 
   if (metaMensal > 0) {
     const totalMesMeta = despesas
