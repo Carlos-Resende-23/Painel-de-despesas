@@ -2,8 +2,10 @@ import "./style.css"
 import {
   CATEGORIAS,
   FREQUENCIAS,
+  FORMAS_PAGAMENTO,
   type Categoria,
   type Despesa,
+  type FormaPagamento,
   type FrequenciaRecorrencia,
   type LimitesCategoria,
 } from "./types.ts"
@@ -83,6 +85,10 @@ function ehDespesa(valor: unknown): valor is Despesa {
     Number.isFinite(registro.valor) &&
     registro.valor > 0 &&
     CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
+    (typeof registro.formaPagamento === "undefined" ||
+      FORMAS_PAGAMENTO.some(
+        (forma) => forma === registro.formaPagamento,
+      )) &&
     dataValida &&
     recorrenteValido &&
     frequenciaValida &&
@@ -192,6 +198,9 @@ const tituloInput = selecionarElemento<HTMLInputElement>("#titulo")
 const valorInput = selecionarElemento<HTMLInputElement>("#valor")
 const dataInput = selecionarElemento<HTMLInputElement>("#data-despesa")
 const categoriaInput = selecionarElemento<HTMLSelectElement>("#categoria")
+const formaPagamentoInput = selecionarElemento<HTMLSelectElement>(
+  "#forma-pagamento",
+)
 const mensagemFormulario = selecionarElemento<HTMLParagraphElement>(
   "#mensagem-formulario",
 )
@@ -255,6 +264,11 @@ const filtroMes = selecionarElemento<HTMLSelectElement>("#mes-filtro")
 const filtroTexto = selecionarElemento<HTMLInputElement>("#filtro-texto")
 const filtroCategoria =
   selecionarElemento<HTMLSelectElement>("#filtro-categoria")
+const filtroPagamento =
+  selecionarElemento<HTMLSelectElement>("#filtro-pagamento")
+const totaisPorPagamento = selecionarElemento<HTMLUListElement>(
+  "#totais-por-pagamento",
+)
 const tituloListaVazia = selecionarElemento<HTMLSpanElement>(
   "#lista-vazia-titulo",
 )
@@ -284,6 +298,13 @@ const nomesCategoria: Record<Categoria, string> = {
   lazer: "Lazer",
   saúde: "Saúde",
   outros: "Outros",
+}
+
+const nomesFormaPagamento: Record<FormaPagamento, string> = {
+  pix: "Pix",
+  credito: "Crédito",
+  debito: "Débito",
+  dinheiro: "Dinheiro",
 }
 
 function obterNomeFrequencia(frequencia?: string): string {
@@ -385,6 +406,7 @@ function registrarOcorrencia(
     titulo: despesa.titulo,
     valor: despesa.valor,
     categoria: despesa.categoria,
+    formaPagamento: despesa.formaPagamento,
     data,
     recorrente: false,
   })
@@ -506,10 +528,16 @@ function obterDespesasVisiveis(): Despesa[] {
     const correspondeACategoria =
       filtroCategoria.value === "todas" ||
       despesa.categoria === filtroCategoria.value
+    const correspondeAoPagamento =
+      filtroPagamento.value === "todas" ||
+      (filtroPagamento.value === "nao-informado"
+        ? !despesa.formaPagamento
+        : despesa.formaPagamento === filtroPagamento.value)
 
     return (
       correspondeAoMes &&
       correspondeACategoria &&
+      correspondeAoPagamento &&
       tituloNormalizado.includes(textoBusca)
     )
   })
@@ -989,6 +1017,41 @@ function atualizarResumo(): void {
     }
   }
 
+  totaisPorPagamento.innerHTML = ""
+  for (const forma of FORMAS_PAGAMENTO) {
+    const totalPagamento = despesasVisiveis
+      .filter((despesa) => despesa.formaPagamento === forma)
+      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const item = document.createElement("li")
+    item.className = "category-total"
+
+    const nome = document.createElement("span")
+    nome.className = "category-label"
+    nome.textContent = nomesFormaPagamento[forma]
+
+    const total = document.createElement("span")
+    total.textContent = formatadorMoeda.format(totalPagamento)
+    item.append(nome, total)
+    totaisPorPagamento.append(item)
+  }
+
+  const totalNaoInformado = despesasVisiveis
+    .filter((despesa) => !despesa.formaPagamento)
+    .reduce((soma, despesa) => soma + despesa.valor, 0)
+  if (totalNaoInformado > 0) {
+    const item = document.createElement("li")
+    item.className = "category-total"
+
+    const nome = document.createElement("span")
+    nome.className = "category-label"
+    nome.textContent = "Não informado"
+
+    const total = document.createElement("span")
+    total.textContent = formatadorMoeda.format(totalNaoInformado)
+    item.append(nome, total)
+    totaisPorPagamento.append(item)
+  }
+
   atualizarGraficoCategorias(despesasVisiveis)
   atualizarGraficoEvolucao()
   atualizarLimitesCategoria(mesEmFoco)
@@ -1058,6 +1121,7 @@ function limparFormulario(): void {
   dataInput.value = obterDataISOlocal()
   checkboxDespesaRecorrente.checked = false
   frequenciaRecorrencia.value = "mensal"
+  formaPagamentoInput.value = ""
   atualizarVisibilidadeRecorrencia()
   despesaEmEdicaoId = null
   botaoSubmit.textContent = "Adicionar despesa"
@@ -1069,6 +1133,7 @@ function preencherFormulario(despesa: Despesa): void {
   valorInput.value = String(despesa.valor)
   dataInput.value = obterDataParaFormulario(despesa.data)
   categoriaInput.value = despesa.categoria
+  formaPagamentoInput.value = despesa.formaPagamento ?? ""
   checkboxDespesaRecorrente.checked = Boolean(despesa.recorrente)
   frequenciaRecorrencia.value = despesa.frequencia ?? "mensal"
   atualizarVisibilidadeRecorrencia()
@@ -1096,6 +1161,12 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   recorrencia.textContent = despesa.recorrente
     ? `Recorrente · ${obterNomeFrequencia(despesa.frequencia)}`
     : "Única"
+
+  const pagamento = document.createElement("span")
+  pagamento.className = "recurrence-badge"
+  pagamento.textContent = despesa.formaPagamento
+    ? nomesFormaPagamento[despesa.formaPagamento]
+    : "Não informado"
 
   const data = document.createElement("time")
   data.className = "expense-date"
@@ -1148,7 +1219,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
       : "Despesa excluída, mas não foi possível salvar a alteração neste navegador."
   })
 
-  detalhes.append(titulo, categoria, recorrencia, data)
+  detalhes.append(titulo, categoria, pagamento, recorrencia, data)
   acoes.append(valor, botaoEditar, botaoExcluir)
   item.append(detalhes, acoes)
   return item
@@ -1180,11 +1251,14 @@ function renderizarLista(): void {
 
 function exportarDespesasVisiveis(): void {
   const linhas = [
-    ["Título", "Valor", "Categoria", "Data"],
+    ["Título", "Valor", "Categoria", "Forma de pagamento", "Data"],
     ...[...obterDespesasVisiveis()].reverse().map((despesa) => [
       despesa.titulo,
       despesa.valor.toFixed(2).replace(".", ","),
       nomesCategoria[despesa.categoria],
+      despesa.formaPagamento
+        ? nomesFormaPagamento[despesa.formaPagamento]
+        : "Não informado",
       formatarData(despesa.data),
     ]),
   ]
@@ -1388,7 +1462,13 @@ function marcarCampoInvalido(
 }
 
 function limparErros(): void {
-  for (const campo of [tituloInput, valorInput, dataInput, categoriaInput]) {
+  for (const campo of [
+    tituloInput,
+    valorInput,
+    dataInput,
+    categoriaInput,
+    formaPagamentoInput,
+  ]) {
     campo.removeAttribute("aria-invalid")
   }
   mensagemFormulario.textContent = ""
@@ -1402,6 +1482,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   const valor = Number(valorInput.value)
   const data = dataInput.value
   const categoriaSelecionada = categoriaInput.value
+  const formaPagamentoSelecionada = formaPagamentoInput.value
   const recorrente = checkboxDespesaRecorrente.checked
   const frequenciaSelecionada = recorrente
     ? (frequenciaRecorrencia.value as FrequenciaRecorrencia)
@@ -1414,11 +1495,18 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   if (!CATEGORIAS.some((categoria) => categoria === categoriaSelecionada)) {
     camposInvalidos.push(categoriaInput)
   }
+  if (
+    !FORMAS_PAGAMENTO.some(
+      (forma) => forma === formaPagamentoSelecionada,
+    )
+  ) {
+    camposInvalidos.push(formaPagamentoInput)
+  }
 
   if (camposInvalidos.length > 0) {
     camposInvalidos.forEach(marcarCampoInvalido)
     mensagemFormulario.textContent =
-      "Preencha título, valor maior que zero, data e categoria."
+      "Preencha título, valor maior que zero, data, categoria e forma de pagamento."
     camposInvalidos[0].focus()
     return
   }
@@ -1428,6 +1516,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     titulo,
     valor,
     categoria: categoriaSelecionada as Categoria,
+    formaPagamento: formaPagamentoSelecionada as FormaPagamento,
     data,
     recorrente,
     frequencia: recorrente ? frequenciaSelecionada : undefined,
@@ -1440,6 +1529,8 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesa.titulo = titulo
       despesa.valor = valor
       despesa.categoria = categoriaSelecionada as Categoria
+      despesa.formaPagamento =
+        formaPagamentoSelecionada as FormaPagamento
       despesa.data = data
       despesa.recorrente = recorrente
       despesa.frequencia = recorrente ? frequenciaSelecionada : undefined
@@ -1514,6 +1605,7 @@ listaLimitesCategoria.addEventListener("input", (evento: Event) => {
 })
 filtroMes.addEventListener("change", atualizarDespesasFiltradas)
 filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
+filtroPagamento.addEventListener("change", atualizarDespesasFiltradas)
 filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)

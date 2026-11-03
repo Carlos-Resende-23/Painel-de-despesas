@@ -342,7 +342,12 @@ select {
   margin-top: 37px;
 }
 
+.payment-summary {
+  margin-top: 25px;
+}
+
 .category-summary h3,
+.payment-summary h3,
 .category-budgets h3,
 .chart-header h3 {
   margin: 0 0 13px;
@@ -1496,6 +1501,10 @@ h1 {
 
   .category-summary {
     margin-top: 22px;
+  }
+
+  .payment-summary {
+    margin-top: 20px;
   }
 
   .category-budgets {

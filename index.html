@@ -134,6 +134,11 @@
             </ul>
           </div>
 
+          <div class="payment-summary">
+            <h3>Por forma de pagamento</h3>
+            <ul id="totais-por-pagamento" class="category-totals"></ul>
+          </div>
+
           <section class="category-budgets" aria-labelledby="category-budgets-title">
             <h3 id="category-budgets-title">Limites por categoria</h3>
             <p class="category-budgets-description">
@@ -239,6 +244,21 @@
                   <option value="lazer">Lazer</option>
                   <option value="saúde">Saúde</option>
                   <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="forma-pagamento">Forma de pagamento</label>
+                <select
+                  id="forma-pagamento"
+                  name="formaPagamento"
+                  aria-describedby="mensagem-formulario"
+                  required
+                >
+                  <option value="">Selecione</option>
+                  <option value="pix">Pix</option>
+                  <option value="credito">Crédito</option>
+                  <option value="debito">Débito</option>
+                  <option value="dinheiro">Dinheiro</option>
                 </select>
               </div>
               <div class="field field-recorrente">
@@ -395,6 +415,17 @@
                 <option value="lazer">Lazer</option>
                 <option value="saúde">Saúde</option>
                 <option value="outros">Outros</option>
+              </select>
+            </div>
+            <div class="expense-filter">
+              <label for="filtro-pagamento">Forma de pagamento</label>
+              <select id="filtro-pagamento">
+                <option value="todas">Todas as formas</option>
+                <option value="pix">Pix</option>
+                <option value="credito">Crédito</option>
+                <option value="debito">Débito</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="nao-informado">Não informado</option>
               </select>
             </div>
           </div>

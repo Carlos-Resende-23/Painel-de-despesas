@@ -3,7 +3,9 @@
 Painel de despesas desenvolvido com Vite e TypeScript.
 
 As despesas e a meta mensal são salvas no navegador. Também é possível marcar
-lançamentos como **recorrentes** (mensal, trimestral ou anual), e o painel
+lançamentos com a forma de pagamento (Pix, crédito, débito ou dinheiro) e
+filtrar e comparar os totais por método. Também é possível marcar lançamentos
+como **recorrentes** (mensal, trimestral ou anual), e o painel
 exibe um resumo dos valores recorrentes cadastrados e uma previsão para os
 próximos seis meses. O histórico também mostra a evolução dos gastos nos
 últimos seis meses e a variação em relação ao mês anterior. A previsão não

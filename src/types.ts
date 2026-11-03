@@ -7,9 +7,11 @@ export const CATEGORIAS = [
 ] as const
 
 export const FREQUENCIAS = ["mensal", "trimestral", "anual"] as const
+export const FORMAS_PAGAMENTO = ["pix", "credito", "debito", "dinheiro"] as const
 
 export type Categoria = (typeof CATEGORIAS)[number]
 export type FrequenciaRecorrencia = (typeof FREQUENCIAS)[number]
+export type FormaPagamento = (typeof FORMAS_PAGAMENTO)[number]
 export type LimitesCategoria = Partial<Record<Categoria, number>>
 
 export type Despesa = {
@@ -17,6 +19,7 @@ export type Despesa = {
   titulo: string
   valor: number
   categoria: Categoria
+  formaPagamento?: FormaPagamento
   data?: string
   recorrente?: boolean
   frequencia?: FrequenciaRecorrencia
