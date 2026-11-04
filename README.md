@@ -28,3 +28,7 @@ Pages a cada push para `main`. Nas configurações do repositório, selecione
 
 Para gerar o site localmente, execute `npm ci` e `npm run build`. Os arquivos
 prontos para publicação serão criados em `dist`.
+
+Para executar os testes automatizados de cálculos, recorrências e backups, use
+`npm test`. O workflow do GitHub Pages executa esses testes antes de compilar e
+publicar o site.

@@ -1,7 +1,16 @@
 import "./style.css"
 import {
+  calcularOcorrenciasPrevistas,
+  criarBackupExportado,
+  ehBackup,
+  ehDespesa,
+  salvarBackupImportado,
+  somarDespesas,
+  somarValores,
+  type OcorrenciaPrevista,
+} from "./domain.ts"
+import {
   CATEGORIAS,
-  FREQUENCIAS,
   FORMAS_PAGAMENTO,
   type Categoria,
   type Despesa,
@@ -34,66 +43,6 @@ function obterDataParaFormulario(data?: string): string {
   return Number.isNaN(dataConvertida.getTime())
     ? obterDataISOlocal()
     : obterDataISOlocal(dataConvertida)
-}
-
-function ehDataValida(data: string): boolean {
-  const dataBrasileira = /^(\d{2})-(\d{2})-(\d{4})$/.exec(data)
-  const dataISO = dataBrasileira
-    ? `${dataBrasileira[3]}-${dataBrasileira[2]}-${dataBrasileira[1]}`
-    : data
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) {
-    return !Number.isNaN(Date.parse(data))
-  }
-
-  const dataConvertida = new Date(`${dataISO}T00:00:00Z`)
-  return (
-    !Number.isNaN(dataConvertida.getTime()) &&
-    dataConvertida.toISOString().slice(0, 10) === dataISO
-  )
-}
-
-function ehDespesa(valor: unknown): valor is Despesa {
-  if (typeof valor !== "object" || valor === null) return false
-
-  const registro = valor as Record<string, unknown>
-  const dataValida =
-    typeof registro.data !== "string" ||
-    ehDataValida(registro.data)
-  const recorrenteValido =
-    typeof registro.recorrente === "undefined" ||
-    typeof registro.recorrente === "boolean"
-  const frequenciaValida =
-    typeof registro.frequencia === "undefined" ||
-    (typeof registro.frequencia === "string" &&
-      FREQUENCIAS.some((frequencia) => frequencia === registro.frequencia))
-  const ocorrenciasRegistradasValidas =
-    typeof registro.ocorrenciasRegistradas === "undefined" ||
-    (Array.isArray(registro.ocorrenciasRegistradas) &&
-      registro.ocorrenciasRegistradas.every(
-        (data) =>
-          typeof data === "string" &&
-          /^\d{4}-\d{2}-\d{2}$/.test(data) &&
-          ehDataValida(data),
-      ))
-
-  return (
-    typeof registro.id === "string" &&
-    typeof registro.titulo === "string" &&
-    registro.titulo.trim().length > 0 &&
-    typeof registro.valor === "number" &&
-    Number.isFinite(registro.valor) &&
-    registro.valor > 0 &&
-    CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
-    (typeof registro.formaPagamento === "undefined" ||
-      FORMAS_PAGAMENTO.some(
-        (forma) => forma === registro.formaPagamento,
-      )) &&
-    dataValida &&
-    recorrenteValido &&
-    frequenciaValida &&
-    ocorrenciasRegistradasValidas
-  )
 }
 
 function carregarDespesas(): Despesa[] {
@@ -345,54 +294,8 @@ function formatarNomeMes(anoMes: string): string {
   })
 }
 
-type OcorrenciaPrevista = {
-  despesa: Despesa
-  data: string
-}
-
 function obterOcorrenciasPrevistas(): OcorrenciaPrevista[] {
-  const hoje = obterDataISOlocal()
-  const [anoAtual, mesAtual] = hoje.split("-").map(Number)
-  const mesAtualIndice = anoAtual * 12 + mesAtual - 1
-  const ocorrencias: OcorrenciaPrevista[] = []
-
-  for (const despesa of despesas) {
-    if (!despesa.recorrente) continue
-
-    const dataBase = obterDataParaFormulario(despesa.data)
-    const [anoBase, mesBase, diaBase] = dataBase.split("-").map(Number)
-    const mesBaseIndice = anoBase * 12 + mesBase - 1
-    const intervalo =
-      despesa.frequencia === "anual"
-        ? 12
-        : despesa.frequencia === "trimestral"
-          ? 3
-          : 1
-    const ocorrenciasRegistradas = new Set(
-      despesa.ocorrenciasRegistradas ?? [],
-    )
-
-    for (let deslocamento = 0; deslocamento < 6; deslocamento += 1) {
-      const indiceMes = mesAtualIndice + deslocamento
-      const mesesDesdeBase = indiceMes - mesBaseIndice
-      if (mesesDesdeBase <= 0 || mesesDesdeBase % intervalo !== 0) continue
-
-      const ano = Math.floor(indiceMes / 12)
-      const mes = indiceMes % 12
-      const ultimoDia = new Date(ano, mes + 1, 0).getDate()
-      const dia = Math.min(diaBase, ultimoDia)
-      const data = obterDataISOlocal(new Date(ano, mes, dia))
-
-      if (data >= hoje && !ocorrenciasRegistradas.has(data)) {
-        ocorrencias.push({ despesa, data })
-      }
-    }
-  }
-
-  return ocorrencias.sort(
-    (a, b) => a.data.localeCompare(b.data) ||
-      a.despesa.titulo.localeCompare(b.despesa.titulo, "pt-BR"),
-  )
+  return calcularOcorrenciasPrevistas(despesas)
 }
 
 function registrarOcorrencia(
@@ -432,10 +335,7 @@ function registrarOcorrencia(
 
 function renderizarPrevisao(): void {
   const ocorrencias = obterOcorrenciasPrevistas()
-  const total = ocorrencias.reduce(
-    (soma, ocorrencia) => soma + ocorrencia.despesa.valor,
-    0,
-  )
+  const total = somarValores(ocorrencias.map(({ despesa }) => despesa.valor))
   previsaoTotal.textContent = formatadorMoeda.format(total)
   previsaoLista.innerHTML = ""
   previsaoVazia.hidden = ocorrencias.length > 0
@@ -463,7 +363,7 @@ function renderizarPrevisao(): void {
     const totalMes = document.createElement("strong")
     totalMes.className = "forecast-month-total"
     totalMes.textContent = formatadorMoeda.format(
-      itens.reduce((soma, item) => soma + item.despesa.valor, 0),
+      somarValores(itens.map(({ despesa }) => despesa.valor)),
     )
     cabecalhoMes.append(tituloMes, totalMes)
     grupo.append(cabecalhoMes)
@@ -575,9 +475,7 @@ function atualizarListaMeses(): void {
 function atualizarGraficoCategorias(despesasVisiveis: Despesa[]): void {
   const totais = CATEGORIAS.map((categoria) => ({
     categoria,
-    total: despesasVisiveis
-      .filter((despesa) => despesa.categoria === categoria)
-      .reduce((soma, despesa) => soma + despesa.valor, 0),
+    total: somarDespesas(despesasVisiveis, { categoria }),
   }))
 
   const maiorTotal = Math.max(...totais.map((item) => item.total), 0)
@@ -613,7 +511,7 @@ function atualizarGraficoCategorias(despesasVisiveis: Despesa[]): void {
     chartCategorias.append(linha)
   }
 
-  const totalGasto = despesasVisiveis.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const totalGasto = somarValores(despesasVisiveis.map(({ valor }) => valor))
 
   if (totalGasto > 0 && categoriaEmDestaque.total > 0) {
     const percentual = Math.round(
@@ -639,7 +537,7 @@ function atualizarGraficoEvolucao(): void {
 
   for (const despesa of despesas) {
     const mes = totaisPorMes.get(obterMesDaData(despesa.data))
-    if (mes) mes.total += despesa.valor
+    if (mes) mes.total = somarValores([mes.total, despesa.valor])
   }
 
   const maiorTotal = Math.max(...meses.map((mes) => mes.total), 0)
@@ -765,13 +663,7 @@ function inicializarLimitesCategoria(): void {
 
 function atualizarLimitesCategoria(mes: string): void {
   for (const categoria of CATEGORIAS) {
-    const total = despesas
-      .filter(
-        (despesa) =>
-          despesa.categoria === categoria &&
-          obterMesDaData(despesa.data ?? obterDataISOlocal()) === mes,
-      )
-      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const total = somarDespesas(despesas, { mes, categoria })
     const limite = limitesCategoria[categoria] ?? 0
     const input = listaLimitesCategoria.querySelector<HTMLInputElement>(
       `[data-categoria="${categoria}"]`,
@@ -860,7 +752,7 @@ function atualizarAlertas(): void {
     (despesa) =>
       obterMesDaData(despesa.data ?? new Date().toISOString()) === mesEmFoco,
   )
-  const totalMes = despesasMes.reduce((soma, despesa) => soma + despesa.valor, 0)
+  const totalMes = somarValores(despesasMes.map(({ valor }) => valor))
   const metaMensal = Number(inputMetaMensal.value || 0)
   const hoje = new Date()
   const mesAtual = obterDataISOlocal().slice(0, 7)
@@ -909,9 +801,7 @@ function atualizarAlertas(): void {
     const limite = limitesCategoria[categoria] ?? 0
     if (limite <= 0) continue
 
-    const totalCategoria = despesasMes
-      .filter((despesa) => despesa.categoria === categoria)
-      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const totalCategoria = somarDespesas(despesasMes, { categoria })
     const percentual = (totalCategoria / limite) * 100
 
     if (percentual >= 100) {
@@ -932,9 +822,8 @@ function atualizarAlertas(): void {
     }
   }
 
-  const recorrentesPrevistos = obterOcorrenciasPrevistas().reduce(
-    (soma, ocorrencia) => soma + ocorrencia.despesa.valor,
-    0,
+  const recorrentesPrevistos = somarValores(
+    obterOcorrenciasPrevistas().map(({ despesa }) => despesa.valor),
   )
   if (recorrentesPrevistos > 0) {
     alertas.push({
@@ -981,17 +870,13 @@ function atualizarAlertas(): void {
 
 function atualizarResumo(): void {
   const despesasVisiveis = obterDespesasVisiveis()
-  const total = despesasVisiveis.reduce(
-    (soma, despesa) => soma + despesa.valor,
-    0,
-  )
+  const total = somarValores(despesasVisiveis.map(({ valor }) => valor))
   const metaMensal = Number(inputMetaMensal.value || 0)
   const mesEmFoco =
     filtroMes.value === "todos" ? obterMesDaData() : filtroMes.value
   const despesasRecorrentes = despesas.filter((despesa) => despesa.recorrente)
-  const totalRecorrente = despesasRecorrentes.reduce(
-    (soma, despesa) => soma + despesa.valor,
-    0,
+  const totalRecorrente = somarValores(
+    despesasRecorrentes.map(({ valor }) => valor),
   )
 
   totalGeral.textContent = formatadorMoeda.format(total)
@@ -1005,9 +890,7 @@ function atualizarResumo(): void {
   }
 
   for (const categoria of CATEGORIAS) {
-    const totalCategoria = despesasVisiveis
-      .filter((despesa) => despesa.categoria === categoria)
-      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const totalCategoria = somarDespesas(despesasVisiveis, { categoria })
     const elementoTotal = document.querySelector<HTMLElement>(
       `[data-total-categoria="${categoria}"]`,
     )
@@ -1019,9 +902,11 @@ function atualizarResumo(): void {
 
   totaisPorPagamento.innerHTML = ""
   for (const forma of FORMAS_PAGAMENTO) {
-    const totalPagamento = despesasVisiveis
-      .filter((despesa) => despesa.formaPagamento === forma)
-      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const totalPagamento = somarValores(
+      despesasVisiveis
+        .filter((despesa) => despesa.formaPagamento === forma)
+        .map(({ valor }) => valor),
+    )
     const item = document.createElement("li")
     item.className = "category-total"
 
@@ -1035,9 +920,11 @@ function atualizarResumo(): void {
     totaisPorPagamento.append(item)
   }
 
-  const totalNaoInformado = despesasVisiveis
-    .filter((despesa) => !despesa.formaPagamento)
-    .reduce((soma, despesa) => soma + despesa.valor, 0)
+  const totalNaoInformado = somarValores(
+    despesasVisiveis
+      .filter((despesa) => !despesa.formaPagamento)
+      .map(({ valor }) => valor),
+  )
   if (totalNaoInformado > 0) {
     const item = document.createElement("li")
     item.className = "category-total"
@@ -1058,13 +945,7 @@ function atualizarResumo(): void {
   atualizarAlertas()
 
   if (metaMensal > 0) {
-    const totalMesMeta = despesas
-      .filter(
-        (despesa) =>
-          obterMesDaData(despesa.data ?? new Date().toISOString()) ===
-          mesEmFoco,
-      )
-      .reduce((soma, despesa) => soma + despesa.valor, 0)
+    const totalMesMeta = somarDespesas(despesas, { mes: mesEmFoco })
 
     const restante = metaMensal - totalMesMeta
     const percentual = Math.round((totalMesMeta / metaMensal) * 100)
@@ -1284,14 +1165,11 @@ function exportarDespesasVisiveis(): void {
 }
 
 function exportarBackup(): void {
-  const backup = {
-    formato: "painel-de-despesas",
-    versao: 1,
-    exportadoEm: new Date().toISOString(),
+  const backup = criarBackupExportado(
     despesas,
-    metaMensal: Number(inputMetaMensal.value || 0),
+    Number(inputMetaMensal.value || 0),
     limitesCategoria,
-  }
+  )
   const arquivo = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json;charset=utf-8",
   })
@@ -1304,105 +1182,6 @@ function exportarBackup(): void {
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
   statusBackup.textContent = "Backup exportado."
-}
-
-function ehBackup(valor: unknown): valor is {
-  formato: "painel-de-despesas"
-  versao: 1
-  despesas: Despesa[]
-  metaMensal: number
-  limitesCategoria?: LimitesCategoria
-} {
-  if (typeof valor !== "object" || valor === null) return false
-
-  const backup = valor as Record<string, unknown>
-  if (
-    backup.formato !== "painel-de-despesas" ||
-    backup.versao !== 1 ||
-    !Array.isArray(backup.despesas) ||
-    typeof backup.metaMensal !== "number" ||
-    !Number.isFinite(backup.metaMensal) ||
-    backup.metaMensal < 0 ||
-    (typeof backup.limitesCategoria !== "undefined" &&
-      !ehLimitesCategoria(backup.limitesCategoria))
-  ) {
-    return false
-  }
-
-  const ids = new Set<string>()
-  for (const despesa of backup.despesas) {
-    if (
-      !ehDespesa(despesa) ||
-      !despesa.id.trim() ||
-      (despesa.data !== undefined &&
-        (typeof despesa.data !== "string" || !ehDataValida(despesa.data))) ||
-      ids.has(despesa.id)
-    ) {
-      return false
-    }
-    ids.add(despesa.id)
-  }
-
-  return true
-}
-
-function restaurarValorArmazenado(chave: string, valor: string | null): boolean {
-  try {
-    if (valor === null) {
-      localStorage.removeItem(chave)
-    } else {
-      localStorage.setItem(chave, valor)
-    }
-    return true
-  } catch {
-    return false
-  }
-}
-
-function salvarBackupImportado(backup: {
-  despesas: Despesa[]
-  metaMensal: number
-  limitesCategoria?: LimitesCategoria
-}): "salvo" | "falhou" | "falhou-parcial" {
-  let despesasAnteriores: string | null
-  let metaAnterior: string | null
-  let limitesAnteriores: string | null
-
-  try {
-    despesasAnteriores = localStorage.getItem(CHAVE_ARMAZENAMENTO)
-    metaAnterior = localStorage.getItem(CHAVE_META_MENSAL)
-    limitesAnteriores = localStorage.getItem(CHAVE_LIMITES_CATEGORIA)
-  } catch {
-    return "falhou"
-  }
-
-  let despesasGravadas = false
-  let metaGravada = false
-  let limitesGravados = false
-  try {
-    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(backup.despesas))
-    despesasGravadas = true
-    localStorage.setItem(CHAVE_META_MENSAL, String(backup.metaMensal))
-    metaGravada = true
-    localStorage.setItem(
-      CHAVE_LIMITES_CATEGORIA,
-      JSON.stringify(backup.limitesCategoria ?? {}),
-    )
-    limitesGravados = true
-    return "salvo"
-  } catch {
-    const despesasRestauradas =
-      !despesasGravadas ||
-      restaurarValorArmazenado(CHAVE_ARMAZENAMENTO, despesasAnteriores)
-    const metaRestaurada =
-      !metaGravada || restaurarValorArmazenado(CHAVE_META_MENSAL, metaAnterior)
-    const limitesRestaurados =
-      !limitesGravados ||
-      restaurarValorArmazenado(CHAVE_LIMITES_CATEGORIA, limitesAnteriores)
-    return despesasRestauradas && metaRestaurada && limitesRestaurados
-      ? "falhou"
-      : "falhou-parcial"
-  }
 }
 
 async function importarBackup(arquivo: File): Promise<void> {
@@ -1435,7 +1214,15 @@ async function importarBackup(arquivo: File): Promise<void> {
     return
   }
 
-  const resultado = salvarBackupImportado(backup)
+  const resultado = salvarBackupImportado(
+    localStorage,
+    {
+      despesas: CHAVE_ARMAZENAMENTO,
+      metaMensal: CHAVE_META_MENSAL,
+      limitesCategoria: CHAVE_LIMITES_CATEGORIA,
+    },
+    backup,
+  )
   if (resultado !== "salvo") {
     statusBackup.textContent =
       resultado === "falhou"
