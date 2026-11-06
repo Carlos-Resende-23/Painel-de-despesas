@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  analisarImportacaoCsv,
   calcularOcorrenciasPrevistas,
   criarBackupExportado,
   ehBackup,
@@ -93,6 +94,53 @@ test("calcula total mensal e por categoria excluindo outros meses", () => {
     somarDespesas(despesas, { mes: "2026-03", categoria: "alimento" }),
     0.3,
   )
+})
+
+test("analisa CSV brasileiro, preserva campos citados e detecta duplicatas", () => {
+  const csv = [
+    '"Título";"Valor";"Categoria";"Forma de pagamento";"Data"',
+    '"Mercado; Centro";"R$ 1.234,56";"Alimento";"Pix";"06/11/2026"',
+    '"Conta";"10,00";"Outros";"Não informado";"31/01/2026"',
+    '"Linha inválida";"0";"Outros";"Pix";"31/02/2026"',
+  ].join("\r\n")
+
+  const resultado = analisarImportacaoCsv(csv, [criarDespesa()])
+
+  assert.equal(resultado.validas.length, 1)
+  assert.deepEqual(resultado.validas[0], {
+    linha: 2,
+    despesa: {
+      titulo: "Mercado; Centro",
+      valor: 1234.56,
+      categoria: "alimento",
+      formaPagamento: "pix",
+      data: "2026-11-06",
+    },
+  })
+  assert.deepEqual(
+    resultado.duplicadas.map(({ linha }) => linha),
+    [3],
+  )
+  assert.deepEqual(
+    resultado.invalidas.map(({ linha }) => linha),
+    [4],
+  )
+})
+
+test("analisa CSV separado por vírgula e rejeita cabeçalho incompatível", () => {
+  const resultado = analisarImportacaoCsv(
+    '\uFEFFtitle,value,category,date\n"Almoço",12.5,lazer,2026-11-06\nExtra,10,lazer,2026-11-06,unexpected',
+  )
+  assert.equal(resultado.validas[0]?.despesa.valor, 12.5)
+  assert.equal(resultado.validas[0]?.despesa.formaPagamento, undefined)
+  assert.deepEqual(
+    resultado.invalidas.map(({ linha }) => linha),
+    [3],
+  )
+
+  const csvIncompativel = analisarImportacaoCsv("Nome;Total\nConta;10")
+  assert.equal(csvIncompativel.validas.length, 0)
+  assert.match(csvIncompativel.invalidas[0]?.motivo ?? "", /Cabeçalho incompatível/)
 })
 
 test("valida datas ISO e brasileiras e rejeita datas impossíveis", () => {

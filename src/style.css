@@ -1237,6 +1237,90 @@ h1 {
   cursor: not-allowed;
 }
 
+.csv-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: min(80vh, 680px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(17, 38, 31, 0.24);
+}
+
+.csv-dialog::backdrop {
+  background: rgba(15, 32, 27, 0.56);
+}
+
+.csv-dialog-content {
+  padding: 26px;
+}
+
+.csv-dialog-content h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.csv-import-summary {
+  margin: 12px 0;
+  color: #53675d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.csv-import-issues {
+  display: grid;
+  max-height: 220px;
+  gap: 7px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  overflow: auto;
+  color: #7a5141;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.csv-import-issues:empty {
+  display: none;
+}
+
+.csv-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.primary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--pine);
+  border-radius: 4px;
+  color: #fff;
+  background: var(--pine);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #28564b;
+}
+
+.primary-button:focus-visible {
+  outline: 3px solid rgba(53, 104, 82, 0.22);
+  outline-offset: 2px;
+}
+
+.primary-button:disabled {
+  border-color: #dce3dc;
+  color: #929b94;
+  background: #f5f6f4;
+  cursor: not-allowed;
+}
+
 .empty-state {
   display: flex;
   min-height: 168px;

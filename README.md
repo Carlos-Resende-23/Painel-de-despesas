@@ -18,7 +18,11 @@ quando o limite está próximo ou foi ultrapassado. Para transferir ou proteger 
 restaurá-lo. O backup inclui despesas, meta mensal e limites por categoria; a
 importação substitui os dados atuais após confirmação. Backups antigos sem
 limites por categoria continuam compatíveis. O CSV continua disponível para
-exportar despesas para planilhas.
+exportar despesas para planilhas. Também é possível importar CSV com prévia:
+linhas válidas são adicionadas, duplicatas são ignoradas e linhas inválidas
+são informadas antes da confirmação. O importador aceita CSV separado por
+ponto e vírgula ou vírgula, com colunas de título, valor, categoria e data;
+forma de pagamento é opcional.
 
 ## GitHub Pages
 
@@ -29,6 +33,7 @@ Pages a cada push para `main`. Nas configurações do repositório, selecione
 Para gerar o site localmente, execute `npm ci` e `npm run build`. Os arquivos
 prontos para publicação serão criados em `dist`.
 
-Para executar os testes automatizados de cálculos, recorrências e backups, use
+Para executar os testes automatizados de cálculos, recorrências, importação CSV
+e backups, use
 `npm test`. O workflow do GitHub Pages executa esses testes antes de compilar e
 publicar o site.

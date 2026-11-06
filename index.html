@@ -380,6 +380,13 @@
                 Importar backup
               </button>
               <button
+                id="importar-csv"
+                class="export-button"
+                type="button"
+              >
+                Importar CSV
+              </button>
+              <button
                 id="exportar-despesas"
                 class="export-button"
                 type="button"
@@ -393,9 +400,47 @@
                 accept="application/json,.json"
                 hidden
               />
+              <input
+                id="arquivo-csv"
+                type="file"
+                accept="text/csv,.csv"
+                hidden
+              />
             </div>
           </div>
           <p id="backup-status" class="backup-status" role="status" aria-live="polite"></p>
+          <dialog
+            id="dialog-importar-csv"
+            class="csv-dialog"
+            aria-labelledby="csv-dialog-title"
+          >
+            <div class="csv-dialog-content">
+              <p class="eyebrow">Importação de planilha</p>
+              <h2 id="csv-dialog-title">Prévia do CSV</h2>
+              <p id="csv-resumo-importacao" class="csv-import-summary"></p>
+              <ul
+                id="csv-problemas-importacao"
+                class="csv-import-issues"
+                aria-label="Linhas que precisam de atenção"
+              ></ul>
+              <div class="csv-dialog-actions">
+                <button
+                  id="cancelar-importacao-csv"
+                  class="export-button"
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="confirmar-importacao-csv"
+                  class="primary-button"
+                  type="button"
+                >
+                  Importar válidas
+                </button>
+              </div>
+            </div>
+          </dialog>
           <div class="expense-filters" aria-label="Filtros de despesas">
             <div class="expense-filter">
               <label for="filtro-texto">Buscar por título</label>

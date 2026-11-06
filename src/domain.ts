@@ -36,6 +36,311 @@ export type FiltroSomaDespesas = {
   categoria?: Categoria
 }
 
+export type LinhaImportacaoCsv = {
+  linha: number
+  despesa: Omit<Despesa, "id">
+}
+
+export type ProblemaImportacaoCsv = {
+  linha: number
+  motivo: string
+}
+
+export type ResultadoImportacaoCsv = {
+  validas: LinhaImportacaoCsv[]
+  duplicadas: ProblemaImportacaoCsv[]
+  invalidas: ProblemaImportacaoCsv[]
+}
+
+type RegistroCsv = {
+  linha: number
+  campos: string[]
+  malformado: boolean
+}
+
+function normalizarCabecalhoCsv(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]/g, "")
+}
+
+function detectarSeparadorCsv(conteudo: string): string {
+  let aspas = false
+  const contagens = new Map<string, number>([
+    [";", 0],
+    [",", 0],
+    ["\t", 0],
+  ])
+
+  for (let indice = 0; indice < conteudo.length; indice += 1) {
+    const caractere = conteudo[indice]
+    if (caractere === '"') {
+      if (aspas && conteudo[indice + 1] === '"') {
+        indice += 1
+      } else {
+        aspas = !aspas
+      }
+    } else if (!aspas && (caractere === "\r" || caractere === "\n")) {
+      break
+    } else if (!aspas && contagens.has(caractere)) {
+      contagens.set(caractere, (contagens.get(caractere) ?? 0) + 1)
+    }
+  }
+
+  return [...contagens].sort((a, b) => b[1] - a[1])[0][0]
+}
+
+function lerRegistrosCsv(conteudo: string, separador: string): RegistroCsv[] {
+  const registros: RegistroCsv[] = []
+  let campos: string[] = []
+  let campo = ""
+  let aspas = false
+  let malformado = false
+  let linha = 1
+  let linhaDoRegistro = 1
+
+  const concluirCampo = () => {
+    campos.push(campo)
+    campo = ""
+  }
+  const concluirRegistro = () => {
+    concluirCampo()
+    if (campos.some((valor) => valor.trim()) || malformado) {
+      registros.push({ linha: linhaDoRegistro, campos, malformado })
+    }
+    campos = []
+    malformado = false
+    linhaDoRegistro = linha + 1
+  }
+
+  for (let indice = 0; indice < conteudo.length; indice += 1) {
+    const caractere = conteudo[indice]
+    if (caractere === '"') {
+      if (aspas && conteudo[indice + 1] === '"') {
+        campo += '"'
+        indice += 1
+      } else if (aspas || campo.length === 0) {
+        aspas = !aspas
+      } else {
+        malformado = true
+        campo += caractere
+      }
+      continue
+    }
+
+    if (!aspas && caractere === separador) {
+      concluirCampo()
+      continue
+    }
+
+    if (!aspas && (caractere === "\r" || caractere === "\n")) {
+      concluirRegistro()
+      if (caractere === "\r" && conteudo[indice + 1] === "\n") {
+        indice += 1
+      }
+      linha += 1
+      linhaDoRegistro = linha
+      continue
+    }
+
+    if (caractere === "\n") linha += 1
+    campo += caractere
+  }
+
+  if (aspas) malformado = true
+  if (campos.length > 0 || campo.length > 0 || malformado) {
+    concluirRegistro()
+  }
+  return registros
+}
+
+function converterValorCsv(valor: string): number | undefined {
+  let normalizado = valor.trim().replace(/^R\$\s*/i, "").replace(/\s/g, "")
+  if (!normalizado) return undefined
+
+  const ultimaVirgula = normalizado.lastIndexOf(",")
+  const ultimoPonto = normalizado.lastIndexOf(".")
+  if (ultimaVirgula >= 0 && ultimoPonto >= 0) {
+    normalizado =
+      ultimaVirgula > ultimoPonto
+        ? normalizado.replace(/\./g, "").replace(",", ".")
+        : normalizado.replace(/,/g, "")
+  } else if (ultimaVirgula >= 0) {
+    normalizado = normalizado.replace(",", ".")
+  }
+
+  if (!/^\+?\d+(?:\.\d+)?$/.test(normalizado)) return undefined
+  const valorNumerico = Number(normalizado)
+  return Number.isFinite(valorNumerico) && valorNumerico > 0
+    ? Math.round(valorNumerico * 100) / 100
+    : undefined
+}
+
+function converterDataCsv(valor: string): string | undefined {
+  const data = valor.trim()
+  let dataISO = data
+  const dataBrasileira = /^(\d{2})[/-](\d{2})[/-](\d{4})$/.exec(data)
+  if (dataBrasileira) {
+    dataISO = `${dataBrasileira[3]}-${dataBrasileira[2]}-${dataBrasileira[1]}`
+  }
+  return ehDataValida(dataISO) && /^\d{4}-\d{2}-\d{2}$/.test(dataISO)
+    ? dataISO
+    : undefined
+}
+
+function chaveDespesaImportada(despesa: Omit<Despesa, "id"> | Despesa): string {
+  return [
+    despesa.titulo.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR"),
+    Math.round(despesa.valor * 100),
+    despesa.categoria,
+    despesa.formaPagamento ?? "",
+    converterDataCsv(despesa.data ?? "") ?? despesa.data ?? "",
+  ].join("|")
+}
+
+export function analisarImportacaoCsv(
+  conteudo: string,
+  despesasExistentes: readonly Despesa[] = [],
+): ResultadoImportacaoCsv {
+  const texto = conteudo.replace(/^\uFEFF/, "")
+  const registros = lerRegistrosCsv(texto, detectarSeparadorCsv(texto))
+  const resultado: ResultadoImportacaoCsv = {
+    validas: [],
+    duplicadas: [],
+    invalidas: [],
+  }
+  const cabecalho = registros.shift()
+
+  if (!cabecalho || cabecalho.malformado) {
+    resultado.invalidas.push({
+      linha: cabecalho?.linha ?? 1,
+      motivo: "Cabeçalho ausente ou CSV malformado.",
+    })
+    return resultado
+  }
+
+  const indices = new Map<string, number>()
+  cabecalho.campos.forEach((campo, indice) => {
+    const nome = normalizarCabecalhoCsv(campo)
+    if (nome === "titulo" || nome === "title" || nome === "descricao") {
+      indices.set("titulo", indice)
+    } else if (nome === "valor" || nome === "value" || nome === "amount") {
+      indices.set("valor", indice)
+    } else if (nome === "categoria" || nome === "category") {
+      indices.set("categoria", indice)
+    } else if (
+      nome === "formadepagamento" ||
+      nome === "pagamento" ||
+      nome === "paymentmethod"
+    ) {
+      indices.set("pagamento", indice)
+    } else if (nome === "data" || nome === "date") {
+      indices.set("data", indice)
+    }
+  })
+
+  const colunasObrigatorias = ["titulo", "valor", "categoria", "data"]
+  const ausentes = colunasObrigatorias.filter((coluna) => !indices.has(coluna))
+  if (ausentes.length > 0) {
+    resultado.invalidas.push({
+      linha: cabecalho.linha,
+      motivo: `Cabeçalho incompatível. Colunas obrigatórias: título, valor, categoria e data.`,
+    })
+    return resultado
+  }
+
+  const categorias: Record<string, Categoria> = {
+    alimento: "alimento",
+    transporte: "transporte",
+    lazer: "lazer",
+    saude: "saúde",
+    outros: "outros",
+  }
+  const formasPagamento: Record<string, Despesa["formaPagamento"]> = {
+    pix: "pix",
+    credito: "credito",
+    debito: "debito",
+    dinheiro: "dinheiro",
+    naoinformado: undefined,
+  }
+  const chavesExistentes = new Set(despesasExistentes.map(chaveDespesaImportada))
+
+  for (const registro of registros) {
+    if (registro.malformado) {
+      resultado.invalidas.push({
+        linha: registro.linha,
+        motivo: "Linha CSV malformada ou com aspas sem par.",
+      })
+      continue
+    }
+    if (registro.campos.length !== cabecalho.campos.length) {
+      resultado.invalidas.push({
+        linha: registro.linha,
+        motivo: "Quantidade de colunas diferente do cabeçalho.",
+      })
+      continue
+    }
+
+    const valorCampo = (nome: string) =>
+      registro.campos[indices.get(nome) ?? -1]?.trim() ?? ""
+    const titulo = valorCampo("titulo")
+    const valor = converterValorCsv(valorCampo("valor"))
+    const categoria = categorias[
+      normalizarCabecalhoCsv(valorCampo("categoria"))
+    ]
+    const data = converterDataCsv(valorCampo("data"))
+    const pagamentoCampo = valorCampo("pagamento")
+    const formaPagamento = pagamentoCampo
+      ? formasPagamento[normalizarCabecalhoCsv(pagamentoCampo)]
+      : undefined
+    const pagamentoValido =
+      !pagamentoCampo ||
+      Object.prototype.hasOwnProperty.call(
+        formasPagamento,
+        normalizarCabecalhoCsv(pagamentoCampo),
+      )
+
+    if (!titulo || !valor || !categoria || !data || !pagamentoValido) {
+      resultado.invalidas.push({
+        linha: registro.linha,
+        motivo: !titulo
+          ? "Título obrigatório."
+          : !valor
+            ? "Valor inválido; informe um número maior que zero."
+            : !categoria
+              ? "Categoria inválida."
+              : !data
+                ? "Data inválida; use DD/MM/AAAA ou AAAA-MM-DD."
+                : "Forma de pagamento inválida.",
+      })
+      continue
+    }
+
+    const despesa: Omit<Despesa, "id"> = {
+      titulo,
+      valor,
+      categoria,
+      formaPagamento,
+      data,
+    }
+    const chave = chaveDespesaImportada(despesa)
+    if (chavesExistentes.has(chave)) {
+      resultado.duplicadas.push({
+        linha: registro.linha,
+        motivo: `Despesa duplicada: ${titulo}.`,
+      })
+      continue
+    }
+
+    chavesExistentes.add(chave)
+    resultado.validas.push({ linha: registro.linha, despesa })
+  }
+
+  return resultado
+}
+
 function dataISOlocal(data: Date): string {
   const ano = data.getFullYear()
   const mes = String(data.getMonth() + 1).padStart(2, "0")

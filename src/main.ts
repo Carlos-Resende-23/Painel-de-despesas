@@ -1,5 +1,6 @@
 import "./style.css"
 import {
+  analisarImportacaoCsv,
   calcularOcorrenciasPrevistas,
   criarBackupExportado,
   ehBackup,
@@ -163,6 +164,23 @@ const botaoExportarBackup =
 const botaoImportarBackup =
   selecionarElemento<HTMLButtonElement>("#importar-backup")
 const arquivoBackup = selecionarElemento<HTMLInputElement>("#arquivo-backup")
+const botaoImportarCsv =
+  selecionarElemento<HTMLButtonElement>("#importar-csv")
+const arquivoCsv = selecionarElemento<HTMLInputElement>("#arquivo-csv")
+const dialogImportarCsv =
+  selecionarElemento<HTMLDialogElement>("#dialog-importar-csv")
+const resumoImportacaoCsv = selecionarElemento<HTMLParagraphElement>(
+  "#csv-resumo-importacao",
+)
+const problemasImportacaoCsv = selecionarElemento<HTMLUListElement>(
+  "#csv-problemas-importacao",
+)
+const botaoConfirmarImportacaoCsv = selecionarElemento<HTMLButtonElement>(
+  "#confirmar-importacao-csv",
+)
+const botaoCancelarImportacaoCsv = selecionarElemento<HTMLButtonElement>(
+  "#cancelar-importacao-csv",
+)
 const statusBackup =
   selecionarElemento<HTMLParagraphElement>("#backup-status")
 const totalGeral = selecionarElemento<HTMLParagraphElement>("#total-geral")
@@ -235,6 +253,8 @@ const comparacaoEvolucao =
   selecionarElemento<HTMLParagraphElement>("#trend-comparison")
 
 let despesaEmEdicaoId: string | null = null
+let importacaoCsvPendente: ReturnType<typeof analisarImportacaoCsv> | null =
+  null
 
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -1164,6 +1184,75 @@ function exportarDespesasVisiveis(): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+async function prepararImportacaoCsv(arquivo: File): Promise<void> {
+  if (arquivo.size > 5 * 1024 * 1024) {
+    statusBackup.textContent = "O arquivo CSV excede o limite de 5 MB."
+    return
+  }
+
+  let conteudo: string
+  try {
+    conteudo = await arquivo.text()
+  } catch {
+    statusBackup.textContent = "Não foi possível ler o arquivo CSV."
+    return
+  }
+
+  const resultado = analisarImportacaoCsv(conteudo, despesas)
+  importacaoCsvPendente = resultado
+  const validas = resultado.validas.length
+  const duplicadas = resultado.duplicadas.length
+  const invalidas = resultado.invalidas.length
+  resumoImportacaoCsv.textContent =
+    `${validas} ${validas === 1 ? "despesa válida" : "despesas válidas"} para importar; ` +
+    `${duplicadas} ${duplicadas === 1 ? "duplicada será ignorada" : "duplicadas serão ignoradas"}; ` +
+    `${invalidas} ${invalidas === 1 ? "linha inválida" : "linhas inválidas"}.`
+
+  problemasImportacaoCsv.replaceChildren()
+  const problemas = [...resultado.duplicadas, ...resultado.invalidas].sort(
+    (a, b) => a.linha - b.linha,
+  )
+  for (const problema of problemas.slice(0, 12)) {
+    const item = document.createElement("li")
+    item.textContent = `Linha ${problema.linha}: ${problema.motivo}`
+    problemasImportacaoCsv.append(item)
+  }
+  if (problemas.length > 12) {
+    const item = document.createElement("li")
+    item.textContent = `Mais ${problemas.length - 12} linhas não exibidas.`
+    problemasImportacaoCsv.append(item)
+  }
+
+  botaoConfirmarImportacaoCsv.disabled = validas === 0
+  statusBackup.textContent = ""
+  dialogImportarCsv.showModal()
+}
+
+function confirmarImportacaoCsv(): void {
+  const resultado = importacaoCsvPendente
+  if (!resultado || resultado.validas.length === 0) return
+
+  const novasDespesas = resultado.validas.map(({ despesa }) => ({
+    id: crypto.randomUUID(),
+    ...despesa,
+  }))
+  despesas.push(...novasDespesas)
+
+  if (!salvarDespesas()) {
+    despesas.splice(despesas.length - novasDespesas.length, novasDespesas.length)
+    statusBackup.textContent =
+      "Não foi possível salvar as despesas importadas. Os dados atuais foram preservados."
+    dialogImportarCsv.close()
+    return
+  }
+
+  atualizarListaMeses()
+  renderizarLista()
+  atualizarResumo()
+  statusBackup.textContent = `${novasDespesas.length} ${novasDespesas.length === 1 ? "despesa importada" : "despesas importadas"} com sucesso.`
+  dialogImportarCsv.close()
+}
+
 function exportarBackup(): void {
   const backup = criarBackupExportado(
     despesas,
@@ -1400,6 +1489,9 @@ botaoExportarBackup.addEventListener("click", exportarBackup)
 botaoImportarBackup.addEventListener("click", () => {
   arquivoBackup.click()
 })
+botaoImportarCsv.addEventListener("click", () => {
+  arquivoCsv.click()
+})
 arquivoBackup.addEventListener("change", async () => {
   const arquivo = arquivoBackup.files?.[0]
   if (!arquivo) return
@@ -1409,6 +1501,26 @@ arquivoBackup.addEventListener("change", async () => {
   } finally {
     arquivoBackup.value = ""
   }
+})
+arquivoCsv.addEventListener("change", async () => {
+  const arquivo = arquivoCsv.files?.[0]
+  if (!arquivo) return
+
+  try {
+    await prepararImportacaoCsv(arquivo)
+  } finally {
+    arquivoCsv.value = ""
+  }
+})
+botaoConfirmarImportacaoCsv.addEventListener(
+  "click",
+  confirmarImportacaoCsv,
+)
+botaoCancelarImportacaoCsv.addEventListener("click", () => {
+  dialogImportarCsv.close()
+})
+dialogImportarCsv.addEventListener("close", () => {
+  importacaoCsvPendente = null
 })
 
 inputMetaMensal.addEventListener("input", () => {
