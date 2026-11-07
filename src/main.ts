@@ -4,7 +4,7 @@ import {
   calcularOcorrenciasPrevistas,
   criarBackupExportado,
   ehBackup,
-  ehDespesa,
+  interpretarDespesasArmazenadas,
   salvarBackupImportado,
   somarDespesas,
   somarValores,
@@ -46,33 +46,26 @@ function obterDataParaFormulario(data?: string): string {
     : obterDataISOlocal(dataConvertida)
 }
 
-function carregarDespesas(): Despesa[] {
+type EstadoCarregamentoDespesas = {
+  despesas: Despesa[]
+  dadosBrutos: string | null
+  erro: "corrompido" | "indisponivel" | null
+}
+
+function carregarDespesas(): EstadoCarregamentoDespesas {
   try {
     const dados = localStorage.getItem(CHAVE_ARMAZENAMENTO)
-    if (!dados) return []
-
-    const despesasSalvas: unknown = JSON.parse(dados)
-
-    if (Array.isArray(despesasSalvas)) {
-      return despesasSalvas.filter(ehDespesa).map((despesa) => ({
+    const resultado = interpretarDespesasArmazenadas(dados)
+    return {
+      despesas: resultado.despesas.map((despesa) => ({
         ...despesa,
         data: obterDataParaFormulario(despesa.data),
-      }))
+      })),
+      dadosBrutos: dados,
+      erro: resultado.corrompido ? "corrompido" : null,
     }
-
-    if (typeof despesasSalvas === "object" && despesasSalvas !== null) {
-      const estado = despesasSalvas as { despesas?: unknown[] }
-      if (Array.isArray(estado.despesas)) {
-        return estado.despesas.filter(ehDespesa).map((despesa) => ({
-          ...despesa,
-          data: obterDataParaFormulario(despesa.data),
-        }))
-      }
-    }
-
-    return []
   } catch {
-    return []
+    return { despesas: [], dadosBrutos: null, erro: "indisponivel" }
   }
 }
 
@@ -132,7 +125,11 @@ function salvarLimitesCategoria(limites: LimitesCategoria): boolean {
   }
 }
 
-const despesas: Despesa[] = carregarDespesas()
+const estadoCarregamentoDespesas = carregarDespesas()
+const despesas: Despesa[] = estadoCarregamentoDespesas.despesas
+let despesasBloqueadas = estadoCarregamentoDespesas.erro !== null
+let dadosDespesasBrutos = estadoCarregamentoDespesas.dadosBrutos
+let erroCarregamentoDespesas = estadoCarregamentoDespesas.erro
 let limitesCategoria: LimitesCategoria = carregarLimitesCategoria()
 
 function selecionarElemento<T extends Element>(seletor: string): T {
@@ -183,6 +180,15 @@ const botaoCancelarImportacaoCsv = selecionarElemento<HTMLButtonElement>(
 )
 const statusBackup =
   selecionarElemento<HTMLParagraphElement>("#backup-status")
+const avisoArmazenamento = selecionarElemento<HTMLDivElement>(
+  "#aviso-armazenamento",
+)
+const avisoArmazenamentoTexto = selecionarElemento<HTMLParagraphElement>(
+  "#aviso-armazenamento-texto",
+)
+const botaoExportarDadosBrutos = selecionarElemento<HTMLButtonElement>(
+  "#exportar-dados-brutos",
+)
 const totalGeral = selecionarElemento<HTMLParagraphElement>("#total-geral")
 const quantidadeDespesas = selecionarElemento<HTMLParagraphElement>(
   "#quantidade-despesas",
@@ -322,6 +328,8 @@ function registrarOcorrencia(
   despesa: Despesa,
   data: string,
 ): void {
+  if (despesasBloqueadas) return
+
   const ocorrenciasAnteriores = despesa.ocorrenciasRegistradas
   despesa.ocorrenciasRegistradas = [...(ocorrenciasAnteriores ?? []), data]
   despesas.push({
@@ -411,6 +419,7 @@ function renderizarPrevisao(): void {
       const botaoRegistrar = document.createElement("button")
       botaoRegistrar.className = "forecast-register"
       botaoRegistrar.type = "button"
+      botaoRegistrar.disabled = despesasBloqueadas
       botaoRegistrar.textContent = "Registrar pagamento"
       botaoRegistrar.setAttribute(
         "aria-label",
@@ -1003,6 +1012,8 @@ function atualizarResumo(): void {
 }
 
 function salvarDespesas(): boolean {
+  if (despesasBloqueadas) return false
+
   try {
     localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(despesas))
     return true
@@ -1084,6 +1095,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const botaoEditar = document.createElement("button")
   botaoEditar.className = "expense-edit"
   botaoEditar.type = "button"
+  botaoEditar.disabled = despesasBloqueadas
   botaoEditar.textContent = "Editar"
   botaoEditar.setAttribute("aria-label", `Editar despesa: ${despesa.titulo}`)
   botaoEditar.addEventListener("click", () => {
@@ -1098,6 +1110,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const botaoExcluir = document.createElement("button")
   botaoExcluir.className = "expense-delete"
   botaoExcluir.type = "button"
+  botaoExcluir.disabled = despesasBloqueadas
   botaoExcluir.textContent = "Excluir"
   botaoExcluir.setAttribute("aria-label", `Excluir despesa: ${despesa.titulo}`)
   botaoExcluir.addEventListener("click", () => {
@@ -1130,7 +1143,7 @@ function renderizarLista(): void {
   const despesasVisiveis = obterDespesasVisiveis()
   renderizarPrevisao()
   listaDespesas.innerHTML = ""
-  botaoExportar.disabled = despesasVisiveis.length === 0
+  botaoExportar.disabled = despesasBloqueadas || despesasVisiveis.length === 0
 
   for (const despesa of [...despesasVisiveis].reverse()) {
     listaDespesas.append(criarItemDespesa(despesa))
@@ -1151,6 +1164,8 @@ function renderizarLista(): void {
 }
 
 function exportarDespesasVisiveis(): void {
+  if (despesasBloqueadas) return
+
   const linhas = [
     ["Título", "Valor", "Categoria", "Forma de pagamento", "Data"],
     ...[...obterDespesasVisiveis()].reverse().map((despesa) => [
@@ -1185,6 +1200,8 @@ function exportarDespesasVisiveis(): void {
 }
 
 async function prepararImportacaoCsv(arquivo: File): Promise<void> {
+  if (despesasBloqueadas) return
+
   if (arquivo.size > 5 * 1024 * 1024) {
     statusBackup.textContent = "O arquivo CSV excede o limite de 5 MB."
     return
@@ -1229,6 +1246,8 @@ async function prepararImportacaoCsv(arquivo: File): Promise<void> {
 }
 
 function confirmarImportacaoCsv(): void {
+  if (despesasBloqueadas) return
+
   const resultado = importacaoCsvPendente
   if (!resultado || resultado.validas.length === 0) return
 
@@ -1254,6 +1273,8 @@ function confirmarImportacaoCsv(): void {
 }
 
 function exportarBackup(): void {
+  if (despesasBloqueadas) return
+
   const backup = criarBackupExportado(
     despesas,
     Number(inputMetaMensal.value || 0),
@@ -1322,6 +1343,10 @@ async function importarBackup(arquivo: File): Promise<void> {
 
   despesas.splice(0, despesas.length)
   backup.despesas.forEach((despesa) => despesas.push({ ...despesa }))
+  despesasBloqueadas = false
+  dadosDespesasBrutos = null
+  erroCarregamentoDespesas = null
+  atualizarAvisoArmazenamento()
   inputMetaMensal.value = String(backup.metaMensal)
   limitesCategoria = { ...(backup.limitesCategoria ?? {}) }
   limparFormulario()
@@ -1352,6 +1377,8 @@ function limparErros(): void {
 
 form.addEventListener("submit", (evento: SubmitEvent) => {
   evento.preventDefault()
+  if (despesasBloqueadas) return
+
   limparErros()
 
   const titulo = tituloInput.value.trim()
@@ -1442,6 +1469,44 @@ function atualizarDespesasFiltradas(): void {
   atualizarResumo()
 }
 
+function atualizarAvisoArmazenamento(): void {
+  avisoArmazenamento.hidden = !despesasBloqueadas
+  if (despesasBloqueadas) {
+    avisoArmazenamentoTexto.textContent =
+      erroCarregamentoDespesas === "corrompido"
+        ? "Os dados de despesas salvos neste navegador estão inválidos ou incompletos. As despesas reconhecidas são exibidas, mas alterações e exportações foram bloqueadas para evitar sobrescrever dados recuperáveis. Exporte o conteúdo bruto ou importe um backup válido para restaurar o uso normal."
+        : "Não foi possível acessar os dados de despesas salvos neste navegador. Alterações e exportações foram bloqueadas para evitar sobrescrever dados recuperáveis. Tente novamente em um navegador com armazenamento disponível ou importe um backup válido."
+  }
+  botaoExportarDadosBrutos.hidden =
+    !despesasBloqueadas || dadosDespesasBrutos === null
+
+  for (const controle of form.querySelectorAll<
+    HTMLInputElement | HTMLSelectElement | HTMLButtonElement
+  >("input, select, button")) {
+    controle.disabled = despesasBloqueadas
+  }
+  botaoExportarBackup.disabled = despesasBloqueadas
+  botaoImportarCsv.disabled = despesasBloqueadas
+  botaoExportar.disabled =
+    despesasBloqueadas || despesas.length === 0
+}
+
+function exportarDadosBrutos(): void {
+  if (dadosDespesasBrutos === null) return
+
+  const arquivo = new Blob([dadosDespesasBrutos], {
+    type: "text/plain;charset=utf-8",
+  })
+  const url = URL.createObjectURL(arquivo)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `recuperacao-despesas-${obterDataISOlocal()}.txt`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
 checkboxDespesaRecorrente.addEventListener("change", atualizarVisibilidadeRecorrencia)
 listaLimitesCategoria.addEventListener("input", (evento: Event) => {
   const input = evento.target
@@ -1486,6 +1551,7 @@ filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)
 botaoExportarBackup.addEventListener("click", exportarBackup)
+botaoExportarDadosBrutos.addEventListener("click", exportarDadosBrutos)
 botaoImportarBackup.addEventListener("click", () => {
   arquivoBackup.click()
 })
@@ -1534,6 +1600,7 @@ inputMetaMensal.addEventListener("input", () => {
 
 inputMetaMensal.value = String(carregarMetaMensal())
 
+atualizarAvisoArmazenamento()
 inicializarLimitesCategoria()
 atualizarVisibilidadeRecorrencia()
 atualizarListaMeses()

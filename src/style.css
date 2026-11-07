@@ -1206,6 +1206,28 @@ h1 {
   font-size: 12px;
 }
 
+.storage-recovery {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid #e8c99a;
+  border-radius: 6px;
+  color: #62451c;
+  background: #fff8eb;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.storage-recovery[hidden] {
+  display: none;
+}
+
+.storage-recovery p {
+  margin: 0;
+}
+
 .export-button {
   min-height: 34px;
   padding: 0 11px;

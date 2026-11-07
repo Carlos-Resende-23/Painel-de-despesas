@@ -7,6 +7,7 @@ import {
   ehBackup,
   ehDataValida,
   ehDespesa,
+  interpretarDespesasArmazenadas,
   salvarBackupImportado,
   somarDespesas,
   somarValores,
@@ -154,6 +155,33 @@ test("rejeita data ausente em tipo inválido e mantém data opcional", () => {
   assert.equal(ehDespesa(criarDespesa({ data: undefined })), true)
   assert.equal(ehDespesa({ ...criarDespesa(), data: 20260131 }), false)
   assert.equal(ehDespesa({ ...criarDespesa(), data: "2026-02-30" }), false)
+})
+
+test("detecta dados de despesas inválidos sem descartar os registros reconhecidos", () => {
+  assert.deepEqual(interpretarDespesasArmazenadas(null), {
+    despesas: [],
+    corrompido: false,
+  })
+  assert.deepEqual(interpretarDespesasArmazenadas("{"), {
+    despesas: [],
+    corrompido: true,
+  })
+  assert.deepEqual(
+    interpretarDespesasArmazenadas(
+      JSON.stringify([criarDespesa(), { id: "invalida" }]),
+    ),
+    { despesas: [criarDespesa()], corrompido: true },
+  )
+  assert.deepEqual(
+    interpretarDespesasArmazenadas(
+      JSON.stringify({ despesas: [criarDespesa()] }),
+    ),
+    { despesas: [criarDespesa()], corrompido: false },
+  )
+  assert.deepEqual(interpretarDespesasArmazenadas('"formato inválido"'), {
+    despesas: [],
+    corrompido: true,
+  })
 })
 
 test("valida backups e mantém compatibilidade com backups sem limites", () => {

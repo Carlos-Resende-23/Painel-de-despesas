@@ -17,7 +17,11 @@ quando o limite está próximo ou foi ultrapassado. Para transferir ou proteger 
 **Exportar backup** para baixar um arquivo JSON e **Importar backup** para
 restaurá-lo. O backup inclui despesas, meta mensal e limites por categoria; a
 importação substitui os dados atuais após confirmação. Backups antigos sem
-limites por categoria continuam compatíveis. O CSV continua disponível para
+limites por categoria continuam compatíveis. Se os dados de despesas no
+navegador estiverem inválidos ou inacessíveis, o painel bloqueia alterações e
+exportações para evitar sobrescrevê-los; quando possível, permite exportar o
+conteúdo bruto para recuperação. Importe um backup válido para retomar o uso
+normal. O CSV continua disponível para
 exportar despesas para planilhas. Também é possível importar CSV com prévia:
 linhas válidas são adicionadas, duplicatas são ignoradas e linhas inválidas
 são informadas antes da confirmação. O importador aceita CSV separado por

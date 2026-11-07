@@ -52,6 +52,11 @@ export type ResultadoImportacaoCsv = {
   invalidas: ProblemaImportacaoCsv[]
 }
 
+export type ResultadoCarregamentoDespesas = {
+  despesas: Despesa[]
+  corrompido: boolean
+}
+
 type RegistroCsv = {
   linha: number
   campos: string[]
@@ -423,6 +428,38 @@ export function ehDespesa(valor: unknown): valor is Despesa {
     frequenciaValida &&
     ocorrenciasRegistradasValidas
   )
+}
+
+export function interpretarDespesasArmazenadas(
+  dados: string | null,
+): ResultadoCarregamentoDespesas {
+  if (dados === null) return { despesas: [], corrompido: false }
+
+  let estado: unknown
+  try {
+    estado = JSON.parse(dados)
+  } catch {
+    return { despesas: [], corrompido: true }
+  }
+
+  let registros: unknown[]
+  if (Array.isArray(estado)) {
+    registros = estado
+  } else if (
+    typeof estado === "object" &&
+    estado !== null &&
+    Array.isArray((estado as { despesas?: unknown }).despesas)
+  ) {
+    registros = (estado as { despesas: unknown[] }).despesas
+  } else {
+    return { despesas: [], corrompido: true }
+  }
+
+  const despesas = registros.filter(ehDespesa)
+  return {
+    despesas,
+    corrompido: despesas.length !== registros.length,
+  }
 }
 
 function ehLimitesCategoria(valor: unknown): valor is LimitesCategoria {
