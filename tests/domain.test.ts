@@ -8,6 +8,7 @@ import {
   ehDataValida,
   ehDespesa,
   interpretarDespesasArmazenadas,
+  ordenarDespesas,
   salvarBackupImportado,
   somarDespesas,
   somarValores,
@@ -80,6 +81,35 @@ function criarArmazenamentoAnterior(): ArmazenamentoEmMemoria {
 test("soma valores em centavos sem erro de ponto flutuante", () => {
   assert.equal(somarValores([0.1, 0.2, 0.3]), 0.6)
   assert.equal(somarValores([]), 0)
+})
+
+test("ordena despesas por data e valor sem alterar a lista original", () => {
+  const despesas = [
+    criarDespesa({ id: "antiga", valor: 20, data: "2026-01-10" }),
+    criarDespesa({ id: "recente-menor", valor: 5, data: "2026-03-10" }),
+    criarDespesa({ id: "recente-maior", valor: 50, data: "2026-03-20" }),
+  ]
+
+  assert.deepEqual(
+    ordenarDespesas(despesas, "recentes", "2026-04-01").map(({ id }) => id),
+    ["recente-maior", "recente-menor", "antiga"],
+  )
+  assert.deepEqual(
+    ordenarDespesas(despesas, "antigas", "2026-04-01").map(({ id }) => id),
+    ["antiga", "recente-menor", "recente-maior"],
+  )
+  assert.deepEqual(
+    ordenarDespesas(despesas, "maior-valor", "2026-04-01").map(({ id }) => id),
+    ["recente-maior", "antiga", "recente-menor"],
+  )
+  assert.deepEqual(
+    ordenarDespesas(despesas, "menor-valor", "2026-04-01").map(({ id }) => id),
+    ["recente-menor", "antiga", "recente-maior"],
+  )
+  assert.deepEqual(
+    despesas.map(({ id }) => id),
+    ["antiga", "recente-menor", "recente-maior"],
+  )
 })
 
 test("calcula total mensal e por categoria excluindo outros meses", () => {

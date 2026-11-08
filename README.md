@@ -26,7 +26,9 @@ exportar despesas para planilhas. Também é possível importar CSV com prévia:
 linhas válidas são adicionadas, duplicatas são ignoradas e linhas inválidas
 são informadas antes da confirmação. O importador aceita CSV separado por
 ponto e vírgula ou vírgula, com colunas de título, valor, categoria e data;
-forma de pagamento é opcional.
+forma de pagamento é opcional. Na lista, é possível ordenar por data (mais
+recentes ou mais antigos) ou por valor (maior ou menor); a exportação CSV
+respeita os filtros e a ordenação selecionados.
 
 ## GitHub Pages
 

@@ -5,6 +5,7 @@ import {
   type Categoria,
   type Despesa,
   type LimitesCategoria,
+  type OrdenacaoDespesas,
 } from "./types.ts"
 
 export type Backup = {
@@ -366,6 +367,40 @@ function normalizarData(data: string | undefined, hoje: string): string {
   return Number.isNaN(dataConvertida.getTime())
     ? hoje
     : dataISOlocal(dataConvertida)
+}
+
+export function ordenarDespesas(
+  despesas: readonly Despesa[],
+  ordenacao: OrdenacaoDespesas,
+  hoje = dataISOlocal(new Date()),
+): Despesa[] {
+  return despesas
+    .map((despesa, indice) => ({ despesa, indice }))
+    .sort((a, b) => {
+      let comparacao = 0
+
+      switch (ordenacao) {
+        case "recentes":
+          comparacao = normalizarData(b.despesa.data, hoje).localeCompare(
+            normalizarData(a.despesa.data, hoje),
+          )
+          break
+        case "antigas":
+          comparacao = normalizarData(a.despesa.data, hoje).localeCompare(
+            normalizarData(b.despesa.data, hoje),
+          )
+          break
+        case "maior-valor":
+          comparacao = b.despesa.valor - a.despesa.valor
+          break
+        case "menor-valor":
+          comparacao = a.despesa.valor - b.despesa.valor
+          break
+      }
+
+      return comparacao || b.indice - a.indice
+    })
+    .map(({ despesa }) => despesa)
 }
 
 export function ehDataValida(data: string): boolean {

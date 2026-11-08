@@ -5,6 +5,7 @@ import {
   criarBackupExportado,
   ehBackup,
   interpretarDespesasArmazenadas,
+  ordenarDespesas,
   salvarBackupImportado,
   somarDespesas,
   somarValores,
@@ -13,6 +14,7 @@ import {
 import {
   CATEGORIAS,
   FORMAS_PAGAMENTO,
+  ORDENACOES_DESPESAS,
   type Categoria,
   type Despesa,
   type FormaPagamento,
@@ -239,6 +241,8 @@ const filtroCategoria =
   selecionarElemento<HTMLSelectElement>("#filtro-categoria")
 const filtroPagamento =
   selecionarElemento<HTMLSelectElement>("#filtro-pagamento")
+const ordenacaoLista =
+  selecionarElemento<HTMLSelectElement>("#ordenacao-despesas")
 const totaisPorPagamento = selecionarElemento<HTMLUListElement>(
   "#totais-por-pagamento",
 )
@@ -470,6 +474,13 @@ function obterDespesasVisiveis(): Despesa[] {
       tituloNormalizado.includes(textoBusca)
     )
   })
+}
+
+function obterDespesasOrdenadas(): Despesa[] {
+  const ordenacao =
+    ORDENACOES_DESPESAS.find((item) => item === ordenacaoLista.value) ??
+    "recentes"
+  return ordenarDespesas(obterDespesasVisiveis(), ordenacao)
 }
 
 function atualizarListaMeses(): void {
@@ -1140,12 +1151,12 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
 }
 
 function renderizarLista(): void {
-  const despesasVisiveis = obterDespesasVisiveis()
+  const despesasVisiveis = obterDespesasOrdenadas()
   renderizarPrevisao()
   listaDespesas.innerHTML = ""
   botaoExportar.disabled = despesasBloqueadas || despesasVisiveis.length === 0
 
-  for (const despesa of [...despesasVisiveis].reverse()) {
+  for (const despesa of despesasVisiveis) {
     listaDespesas.append(criarItemDespesa(despesa))
   }
 
@@ -1168,7 +1179,7 @@ function exportarDespesasVisiveis(): void {
 
   const linhas = [
     ["Título", "Valor", "Categoria", "Forma de pagamento", "Data"],
-    ...[...obterDespesasVisiveis()].reverse().map((despesa) => [
+    ...obterDespesasOrdenadas().map((despesa) => [
       despesa.titulo,
       despesa.valor.toFixed(2).replace(".", ","),
       nomesCategoria[despesa.categoria],
@@ -1548,6 +1559,7 @@ filtroMes.addEventListener("change", atualizarDespesasFiltradas)
 filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
 filtroPagamento.addEventListener("change", atualizarDespesasFiltradas)
 filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
+ordenacaoLista.addEventListener("change", atualizarDespesasFiltradas)
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)
 botaoExportarBackup.addEventListener("click", exportarBackup)
