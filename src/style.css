@@ -1500,6 +1500,7 @@ h1 {
 }
 
 .expense-edit,
+.expense-repeat,
 .expense-delete {
   min-height: 32px;
   padding: 0 8px;
@@ -1515,14 +1516,21 @@ h1 {
   background: #edf4ef;
 }
 
-.expense-edit:hover {
+.expense-edit:hover,
+.expense-repeat:hover {
   border-color: #d4e6d7;
   background: #e4f0e7;
 }
 
-.expense-edit:focus-visible {
+.expense-edit:focus-visible,
+.expense-repeat:focus-visible {
   outline: 3px solid rgba(53, 104, 82, 0.18);
   outline-offset: 2px;
+}
+
+.expense-repeat {
+  color: #335343;
+  background: #edf4ef;
 }
 
 .expense-delete {

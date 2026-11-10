@@ -1062,6 +1062,21 @@ function preencherFormulario(despesa: Despesa): void {
   atualizarVisibilidadeRecorrencia()
 }
 
+function repetirDespesa(despesa: Despesa): void {
+  limparErros()
+  despesaEmEdicaoId = null
+  preencherFormulario(despesa)
+  dataInput.value = obterDataISOlocal()
+  checkboxDespesaRecorrente.checked = false
+  frequenciaRecorrencia.value = "mensal"
+  atualizarVisibilidadeRecorrencia()
+  botaoSubmit.textContent = "Adicionar despesa"
+  botaoCancelarEdicao.hidden = true
+  mensagemFormulario.textContent =
+    "Dados copiados para um novo lançamento. Revise e salve."
+  tituloInput.focus()
+}
+
 function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const item = document.createElement("li")
   item.className = "expense-item"
@@ -1118,6 +1133,19 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
     tituloInput.focus()
   })
 
+  const botaoRepetir = document.createElement("button")
+  botaoRepetir.className = "expense-repeat"
+  botaoRepetir.type = "button"
+  botaoRepetir.disabled = despesasBloqueadas
+  botaoRepetir.textContent = "Repetir"
+  botaoRepetir.setAttribute(
+    "aria-label",
+    `Repetir despesa: ${despesa.titulo}`,
+  )
+  botaoRepetir.addEventListener("click", () => {
+    repetirDespesa(despesa)
+  })
+
   const botaoExcluir = document.createElement("button")
   botaoExcluir.className = "expense-delete"
   botaoExcluir.type = "button"
@@ -1145,7 +1173,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   })
 
   detalhes.append(titulo, categoria, pagamento, recorrencia, data)
-  acoes.append(valor, botaoEditar, botaoExcluir)
+  acoes.append(valor, botaoEditar, botaoRepetir, botaoExcluir)
   item.append(detalhes, acoes)
   return item
 }
