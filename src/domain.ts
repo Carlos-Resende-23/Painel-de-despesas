@@ -567,6 +567,110 @@ export function somarDespesas(
   return somarValores(despesasFiltradas.map(({ valor }) => valor))
 }
 
+export type EvolucaoMensal = {
+  mes: string
+  total: number
+}
+
+export type VariacaoMensal = {
+  mesAtual: string
+  mesAnterior: string
+  totalAtual: number
+  totalAnterior: number
+  diferenca: number
+  percentual: number
+  direcao: "aumento" | "queda" | "igual"
+}
+
+function construirSerieMensal(
+  hoje: string,
+  quantidadeMeses: number,
+): Array<{ mes: string; total: number }> {
+  const [anoAtual, mesAtual] = hoje.split("-").map(Number)
+  const meses = Array.from({ length: quantidadeMeses }, (_, indice) => {
+    const data = new Date(
+      anoAtual,
+      mesAtual - 1 - (quantidadeMeses - 1) + indice,
+      1,
+    )
+    return {
+      mes: dataISOlocal(data).slice(0, 7),
+      total: 0,
+    }
+  })
+
+  return meses
+}
+
+export function calcularEvolucaoMensal(
+  despesas: readonly Despesa[],
+  hoje = dataISOlocal(new Date()),
+  quantidadeMeses = 6,
+): EvolucaoMensal[] {
+  const serie = construirSerieMensal(hoje, quantidadeMeses)
+  const totais = new Map(serie.map((mes) => [mes.mes, mes]))
+
+  for (const despesa of despesas) {
+    const chaveMes = normalizarData(despesa.data, hoje).slice(0, 7)
+    const mes = totais.get(chaveMes)
+    if (mes) {
+      mes.total = somarValores([mes.total, despesa.valor])
+    }
+  }
+
+  return serie
+}
+
+export function calcularTendenciaMensal(
+  despesas: readonly Despesa[],
+  hoje = dataISOlocal(new Date()),
+  quantidadeMeses = 6,
+): EvolucaoMensal[] {
+  return calcularEvolucaoMensal(despesas, hoje, quantidadeMeses)
+}
+
+export function calcularVariacaoMensal(
+  despesas: readonly Despesa[],
+  hoje = dataISOlocal(new Date()),
+  quantidadeMeses = 6,
+): VariacaoMensal | null {
+  const evolucao = calcularEvolucaoMensal(despesas, hoje, quantidadeMeses)
+  const mesAtual = evolucao.at(-1)
+  const mesAnterior = evolucao.at(-2)
+
+  if (!mesAtual || !mesAnterior) return null
+
+  const totalAtual = mesAtual.total
+  const totalAnterior = mesAnterior.total
+  const diferenca = totalAtual - totalAnterior
+  const percentual =
+    totalAnterior === 0
+      ? totalAtual === 0
+        ? 0
+        : 100
+      : Number(((Math.abs(diferenca) / totalAnterior) * 100).toFixed(1))
+
+  let direcao: VariacaoMensal["direcao"] = "igual"
+  if (diferenca > 0) direcao = "aumento"
+  else if (diferenca < 0) direcao = "queda"
+
+  return {
+    mesAtual: mesAtual.mes,
+    mesAnterior: mesAnterior.mes,
+    totalAtual,
+    totalAnterior,
+    diferenca,
+    percentual,
+    direcao,
+  }
+}
+
+export const calcularComparacaoEvolucaoMensal = calcularVariacaoMensal
+export const calcularEvolucao = calcularEvolucaoMensal
+export const calcularTendencia = calcularEvolucaoMensal
+export const obterEvolucaoMensal = calcularEvolucaoMensal
+export const obterVariacaoMensal = calcularVariacaoMensal
+
 export function criarBackupExportado(
   despesas: Despesa[],
   metaMensal: number,

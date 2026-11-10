@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   analisarImportacaoCsv,
+  calcularEvolucaoMensal,
   calcularOcorrenciasPrevistas,
+  calcularVariacaoMensal,
   criarBackupExportado,
   ehBackup,
   ehDataValida,
@@ -125,6 +127,39 @@ test("calcula total mensal e por categoria excluindo outros meses", () => {
     somarDespesas(despesas, { mes: "2026-03", categoria: "alimento" }),
     0.3,
   )
+})
+
+test("calcula evolução mensal e variação com relação ao mês anterior", () => {
+  const despesas = [
+    criarDespesa({ id: "mes-1", valor: 30, data: "2025-12-05", categoria: "alimento" }),
+    criarDespesa({ id: "mes-2", valor: 10, data: "2026-01-10", categoria: "transporte" }),
+    criarDespesa({ id: "mes-3", valor: 20, data: "2026-01-15", categoria: "lazer" }),
+    criarDespesa({ id: "mes-4", valor: 40, data: "2026-02-20", categoria: "saúde" }),
+    criarDespesa({ id: "mes-5", valor: 15, data: "2026-02-25", categoria: "outros" }),
+  ]
+
+  const evolucao = calcularEvolucaoMensal(despesas, "2026-02-28")
+  assert.deepEqual(
+    evolucao.map(({ mes, total }) => [mes, total]),
+    [
+      ["2025-09", 0],
+      ["2025-10", 0],
+      ["2025-11", 0],
+      ["2025-12", 30],
+      ["2026-01", 30],
+      ["2026-02", 55],
+    ],
+  )
+
+  assert.deepEqual(calcularVariacaoMensal(despesas, "2026-02-28"), {
+    mesAtual: "2026-02",
+    mesAnterior: "2026-01",
+    totalAtual: 55,
+    totalAnterior: 30,
+    diferenca: 25,
+    percentual: 83.3,
+    direcao: "aumento",
+  })
 })
 
 test("analisa CSV brasileiro, preserva campos citados e detecta duplicatas", () => {
