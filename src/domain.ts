@@ -163,7 +163,10 @@ function lerRegistrosCsv(conteudo: string, separador: string): RegistroCsv[] {
 }
 
 function converterValorCsv(valor: string): number | undefined {
-  let normalizado = valor.trim().replace(/^R\$\s*/i, "").replace(/\s/g, "")
+  let normalizado = valor
+    .trim()
+    .replace(/^R\$\s*/i, "")
+    .replace(/\s/g, "")
   if (!normalizado) return undefined
 
   const ultimaVirgula = normalizado.lastIndexOf(",")
@@ -204,6 +207,50 @@ function chaveDespesaImportada(despesa: Omit<Despesa, "id"> | Despesa): string {
     despesa.formaPagamento ?? "",
     converterDataCsv(despesa.data ?? "") ?? despesa.data ?? "",
   ].join("|")
+}
+
+function normalizarTextoDespesa(valor: string): string {
+  return valor
+    .trim()
+    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+}
+
+export function encontrarDespesaDuplicada(
+  despesas: readonly Despesa[],
+  candidata: Pick<
+    Despesa,
+    "titulo" | "valor" | "categoria" | "formaPagamento" | "data"
+  >,
+  idIgnorado?: string,
+): Despesa | undefined {
+  const chaveCandidata = [
+    normalizarTextoDespesa(candidata.titulo),
+    Math.round(candidata.valor * 100),
+    candidata.categoria,
+    candidata.formaPagamento ?? "",
+    normalizarData(candidata.data, dataISOlocal(new Date())) ?? "",
+  ].join("|")
+
+  for (const despesa of despesas) {
+    if (idIgnorado && despesa.id === idIgnorado) continue
+
+    const chaveAtual = [
+      normalizarTextoDespesa(despesa.titulo),
+      Math.round(despesa.valor * 100),
+      despesa.categoria,
+      despesa.formaPagamento ?? "",
+      normalizarData(despesa.data, dataISOlocal(new Date())) ?? "",
+    ].join("|")
+
+    if (chaveAtual === chaveCandidata) {
+      return despesa
+    }
+  }
+
+  return undefined
 }
 
 export function analisarImportacaoCsv(
@@ -271,7 +318,9 @@ export function analisarImportacaoCsv(
     dinheiro: "dinheiro",
     naoinformado: undefined,
   }
-  const chavesExistentes = new Set(despesasExistentes.map(chaveDespesaImportada))
+  const chavesExistentes = new Set(
+    despesasExistentes.map(chaveDespesaImportada),
+  )
 
   for (const registro of registros) {
     if (registro.malformado) {
@@ -293,9 +342,8 @@ export function analisarImportacaoCsv(
       registro.campos[indices.get(nome) ?? -1]?.trim() ?? ""
     const titulo = valorCampo("titulo")
     const valor = converterValorCsv(valorCampo("valor"))
-    const categoria = categorias[
-      normalizarCabecalhoCsv(valorCampo("categoria"))
-    ]
+    const categoria =
+      categorias[normalizarCabecalhoCsv(valorCampo("categoria"))]
     const data = converterDataCsv(valorCampo("data"))
     const pagamentoCampo = valorCampo("pagamento")
     const formaPagamento = pagamentoCampo
@@ -455,9 +503,7 @@ export function ehDespesa(valor: unknown): valor is Despesa {
     registro.valor > 0 &&
     CATEGORIAS.some((categoria) => categoria === registro.categoria) &&
     (typeof registro.formaPagamento === "undefined" ||
-      FORMAS_PAGAMENTO.some(
-        (forma) => forma === registro.formaPagamento,
-      )) &&
+      FORMAS_PAGAMENTO.some((forma) => forma === registro.formaPagamento)) &&
     dataValida &&
     recorrenteValido &&
     frequenciaValida &&
@@ -559,8 +605,7 @@ export function somarDespesas(
       filtro.mes === undefined ||
       normalizarData(despesa.data, hoje).slice(0, 7) === filtro.mes
     const categoriaCorrespondente =
-      filtro.categoria === undefined ||
-      despesa.categoria === filtro.categoria
+      filtro.categoria === undefined || despesa.categoria === filtro.categoria
     return mesCorrespondente && categoriaCorrespondente
   })
 
@@ -707,9 +752,7 @@ export function calcularOcorrenciasPrevistas(
         : despesa.frequencia === "trimestral"
           ? 3
           : 1
-    const ocorrenciasRegistradas = new Set(
-      despesa.ocorrenciasRegistradas ?? [],
-    )
+    const ocorrenciasRegistradas = new Set(despesa.ocorrenciasRegistradas ?? [])
 
     for (let deslocamento = 0; deslocamento < 6; deslocamento += 1) {
       const indiceMes = mesAtualIndice + deslocamento

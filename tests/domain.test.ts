@@ -9,6 +9,7 @@ import {
   ehBackup,
   ehDataValida,
   ehDespesa,
+  encontrarDespesaDuplicada,
   interpretarDespesasArmazenadas,
   ordenarDespesas,
   salvarBackupImportado,
@@ -59,9 +60,7 @@ class ArmazenamentoEmMemoria implements ArmazenamentoBackup {
 
   setItem(chave: string, valor: string): void {
     this.tentativasDeGravacao += 1
-    if (
-      this.falharAoGravar?.(chave, valor, this.tentativasDeGravacao)
-    ) {
+    if (this.falharAoGravar?.(chave, valor, this.tentativasDeGravacao)) {
       throw new Error("Falha simulada de armazenamento")
     }
     this.valores.set(chave, valor)
@@ -117,9 +116,24 @@ test("ordena despesas por data e valor sem alterar a lista original", () => {
 test("calcula total mensal e por categoria excluindo outros meses", () => {
   const despesas = [
     criarDespesa({ valor: 0.1, data: "2026-03-01", categoria: "alimento" }),
-    criarDespesa({ id: "2", valor: 0.2, data: "2026-03-31", categoria: "alimento" }),
-    criarDespesa({ id: "3", valor: 50, data: "2026-03-10", categoria: "transporte" }),
-    criarDespesa({ id: "4", valor: 100, data: "2026-04-01", categoria: "alimento" }),
+    criarDespesa({
+      id: "2",
+      valor: 0.2,
+      data: "2026-03-31",
+      categoria: "alimento",
+    }),
+    criarDespesa({
+      id: "3",
+      valor: 50,
+      data: "2026-03-10",
+      categoria: "transporte",
+    }),
+    criarDespesa({
+      id: "4",
+      valor: 100,
+      data: "2026-04-01",
+      categoria: "alimento",
+    }),
   ]
 
   assert.equal(somarDespesas(despesas, { mes: "2026-03" }), 50.3)
@@ -131,11 +145,36 @@ test("calcula total mensal e por categoria excluindo outros meses", () => {
 
 test("calcula evolução mensal e variação com relação ao mês anterior", () => {
   const despesas = [
-    criarDespesa({ id: "mes-1", valor: 30, data: "2025-12-05", categoria: "alimento" }),
-    criarDespesa({ id: "mes-2", valor: 10, data: "2026-01-10", categoria: "transporte" }),
-    criarDespesa({ id: "mes-3", valor: 20, data: "2026-01-15", categoria: "lazer" }),
-    criarDespesa({ id: "mes-4", valor: 40, data: "2026-02-20", categoria: "saúde" }),
-    criarDespesa({ id: "mes-5", valor: 15, data: "2026-02-25", categoria: "outros" }),
+    criarDespesa({
+      id: "mes-1",
+      valor: 30,
+      data: "2025-12-05",
+      categoria: "alimento",
+    }),
+    criarDespesa({
+      id: "mes-2",
+      valor: 10,
+      data: "2026-01-10",
+      categoria: "transporte",
+    }),
+    criarDespesa({
+      id: "mes-3",
+      valor: 20,
+      data: "2026-01-15",
+      categoria: "lazer",
+    }),
+    criarDespesa({
+      id: "mes-4",
+      valor: 40,
+      data: "2026-02-20",
+      categoria: "saúde",
+    }),
+    criarDespesa({
+      id: "mes-5",
+      valor: 15,
+      data: "2026-02-25",
+      categoria: "outros",
+    }),
   ]
 
   const evolucao = calcularEvolucaoMensal(despesas, "2026-02-28")
@@ -206,7 +245,67 @@ test("analisa CSV separado por vírgula e rejeita cabeçalho incompatível", () 
 
   const csvIncompativel = analisarImportacaoCsv("Nome;Total\nConta;10")
   assert.equal(csvIncompativel.validas.length, 0)
-  assert.match(csvIncompativel.invalidas[0]?.motivo ?? "", /Cabeçalho incompatível/)
+  assert.match(
+    csvIncompativel.invalidas[0]?.motivo ?? "",
+    /Cabeçalho incompatível/,
+  )
+})
+
+test("detecta duplicatas em despesas manuais usando dados estáveis", () => {
+  const despesas = [
+    criarDespesa({
+      id: "duplicata-1",
+      titulo: "Mercado",
+      valor: 123.45,
+      categoria: "alimento",
+      formaPagamento: "pix",
+      data: "2026-11-06",
+    }),
+    criarDespesa({
+      id: "outro",
+      titulo: "Energia",
+      valor: 80,
+      categoria: "outros",
+      data: "2026-11-07",
+    }),
+  ]
+
+  assert.equal(
+    encontrarDespesaDuplicada(despesas, {
+      titulo: "Mercado",
+      valor: 123.45,
+      categoria: "alimento",
+      formaPagamento: "pix",
+      data: "2026-11-06",
+    })?.id,
+    "duplicata-1",
+  )
+
+  assert.equal(
+    encontrarDespesaDuplicada(despesas, {
+      titulo: "Mercado",
+      valor: 123.45,
+      categoria: "alimento",
+      formaPagamento: "debito",
+      data: "2026-11-06",
+    }),
+    undefined,
+  )
+
+  assert.equal(
+    encontrarDespesaDuplicada(
+      despesas,
+      {
+        titulo: " Mercado ",
+        valor: 123.45,
+        categoria: "alimento",
+        formaPagamento: "pix",
+        data: "2026-11-06",
+      },
+      "duplicata-1",
+    )?.id,
+    undefined,
+  )
 })
 
 test("valida datas ISO e brasileiras e rejeita datas impossíveis", () => {
@@ -261,7 +360,10 @@ test("valida backups e mantém compatibilidade com backups sem limites", () => {
   )
   assert.equal(ehBackup(criarBackup({ metaMensal: -1 })), false)
   assert.equal(
-    ehBackup({ ...criarBackup(), limitesCategoria: { categoria_invalida: 20 } }),
+    ehBackup({
+      ...criarBackup(),
+      limitesCategoria: { categoria_invalida: 20 },
+    }),
     false,
   )
   assert.equal(
@@ -329,10 +431,7 @@ test("prevê frequências trimestrais e anuais, omitindo ocorrências pagas", ()
   )
   assert.deepEqual(
     ocorrencias.map(({ despesa, data }) => `${despesa.id}:${data}`),
-    [
-      "anual:2026-04-30",
-      "despesa-1:2026-07-31",
-    ],
+    ["anual:2026-04-30", "despesa-1:2026-07-31"],
   )
 })
 
@@ -353,8 +452,7 @@ test("importa todas as partes do backup, removendo limites ausentes", () => {
 test("restaura dados anteriores se uma gravação do backup falhar", () => {
   const armazenamento = criarArmazenamentoAnterior()
   const valoresAnteriores = new Map(armazenamento.valores)
-  armazenamento.falharAoGravar = (_chave, _valor, tentativa) =>
-    tentativa === 2
+  armazenamento.falharAoGravar = (_chave, _valor, tentativa) => tentativa === 2
 
   assert.equal(
     salvarBackupImportado(armazenamento, chaves, criarBackup()),

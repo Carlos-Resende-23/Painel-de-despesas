@@ -4,6 +4,7 @@ import {
   calcularOcorrenciasPrevistas,
   criarBackupExportado,
   ehBackup,
+  encontrarDespesaDuplicada,
   interpretarDespesasArmazenadas,
   ordenarDespesas,
   salvarBackupImportado,
@@ -147,27 +148,25 @@ const tituloInput = selecionarElemento<HTMLInputElement>("#titulo")
 const valorInput = selecionarElemento<HTMLInputElement>("#valor")
 const dataInput = selecionarElemento<HTMLInputElement>("#data-despesa")
 const categoriaInput = selecionarElemento<HTMLSelectElement>("#categoria")
-const formaPagamentoInput = selecionarElemento<HTMLSelectElement>(
-  "#forma-pagamento",
-)
+const formaPagamentoInput =
+  selecionarElemento<HTMLSelectElement>("#forma-pagamento")
 const mensagemFormulario = selecionarElemento<HTMLParagraphElement>(
   "#mensagem-formulario",
 )
 const listaDespesas = selecionarElemento<HTMLUListElement>("#lista-despesas")
 const listaVazia = selecionarElemento<HTMLParagraphElement>("#lista-vazia")
-const botaoExportar = selecionarElemento<HTMLButtonElement>(
-  "#exportar-despesas",
-)
+const botaoExportar =
+  selecionarElemento<HTMLButtonElement>("#exportar-despesas")
 const botaoExportarBackup =
   selecionarElemento<HTMLButtonElement>("#exportar-backup")
 const botaoImportarBackup =
   selecionarElemento<HTMLButtonElement>("#importar-backup")
 const arquivoBackup = selecionarElemento<HTMLInputElement>("#arquivo-backup")
-const botaoImportarCsv =
-  selecionarElemento<HTMLButtonElement>("#importar-csv")
+const botaoImportarCsv = selecionarElemento<HTMLButtonElement>("#importar-csv")
 const arquivoCsv = selecionarElemento<HTMLInputElement>("#arquivo-csv")
-const dialogImportarCsv =
-  selecionarElemento<HTMLDialogElement>("#dialog-importar-csv")
+const dialogImportarCsv = selecionarElemento<HTMLDialogElement>(
+  "#dialog-importar-csv",
+)
 const resumoImportacaoCsv = selecionarElemento<HTMLParagraphElement>(
   "#csv-resumo-importacao",
 )
@@ -180,8 +179,7 @@ const botaoConfirmarImportacaoCsv = selecionarElemento<HTMLButtonElement>(
 const botaoCancelarImportacaoCsv = selecionarElemento<HTMLButtonElement>(
   "#cancelar-importacao-csv",
 )
-const statusBackup =
-  selecionarElemento<HTMLParagraphElement>("#backup-status")
+const statusBackup = selecionarElemento<HTMLParagraphElement>("#backup-status")
 const avisoArmazenamento = selecionarElemento<HTMLDivElement>(
   "#aviso-armazenamento",
 )
@@ -199,14 +197,15 @@ const contadorLista = selecionarElemento<HTMLSpanElement>("#contador-lista")
 const alertasFinanceiros = selecionarElemento<HTMLUListElement>(
   "#alertas-financeiros",
 )
-const chartCategorias = selecionarElemento<HTMLDivElement>("#grafico-categorias")
+const chartCategorias = selecionarElemento<HTMLDivElement>(
+  "#grafico-categorias",
+)
 const chartCaption = selecionarElemento<HTMLSpanElement>("#chart-caption")
 const listaLimitesCategoria = selecionarElemento<HTMLDivElement>(
   "#orcamentos-categoria",
 )
-const statusLimitesCategoria = selecionarElemento<HTMLParagraphElement>(
-  "#orcamentos-status",
-)
+const statusLimitesCategoria =
+  selecionarElemento<HTMLParagraphElement>("#orcamentos-status")
 const botaoSubmit = selecionarElemento<HTMLButtonElement>("#submit-despesa")
 const botaoCancelarEdicao =
   selecionarElemento<HTMLButtonElement>("#cancelar-edicao")
@@ -217,9 +216,7 @@ const statusMetaMensal = selecionarElemento<HTMLParagraphElement>(
 const progressoMetaMensal = selecionarElemento<HTMLDivElement>(
   "#meta-mensal-progresso",
 )
-const barraMetaMensal = selecionarElemento<HTMLDivElement>(
-  "#meta-mensal-barra",
-)
+const barraMetaMensal = selecionarElemento<HTMLDivElement>("#meta-mensal-barra")
 const preenchimentoMetaMensal = selecionarElemento<HTMLSpanElement>(
   "#meta-mensal-preenchimento",
 )
@@ -241,8 +238,9 @@ const filtroCategoria =
   selecionarElemento<HTMLSelectElement>("#filtro-categoria")
 const filtroPagamento =
   selecionarElemento<HTMLSelectElement>("#filtro-pagamento")
-const ordenacaoLista =
-  selecionarElemento<HTMLSelectElement>("#ordenacao-despesas")
+const ordenacaoLista = selecionarElemento<HTMLSelectElement>(
+  "#ordenacao-despesas",
+)
 const totaisPorPagamento = selecionarElemento<HTMLUListElement>(
   "#totais-por-pagamento",
 )
@@ -254,10 +252,10 @@ const descricaoListaVazia = selecionarElemento<HTMLSpanElement>(
 )
 const previsaoTotal = selecionarElemento<HTMLElement>("#previsao-total")
 const previsaoLista = selecionarElemento<HTMLDivElement>("#previsao-lista")
-const previsaoVazia = selecionarElemento<HTMLParagraphElement>("#previsao-vazia")
-const previsaoStatus = selecionarElemento<HTMLParagraphElement>(
-  "#previsao-status",
-)
+const previsaoVazia =
+  selecionarElemento<HTMLParagraphElement>("#previsao-vazia")
+const previsaoStatus =
+  selecionarElemento<HTMLParagraphElement>("#previsao-status")
 const graficoEvolucao = selecionarElemento<HTMLDivElement>("#grafico-evolucao")
 const comparacaoEvolucao =
   selecionarElemento<HTMLParagraphElement>("#trend-comparison")
@@ -328,10 +326,7 @@ function obterOcorrenciasPrevistas(): OcorrenciaPrevista[] {
   return calcularOcorrenciasPrevistas(despesas)
 }
 
-function registrarOcorrencia(
-  despesa: Despesa,
-  data: string,
-): void {
+function registrarOcorrencia(despesa: Despesa, data: string): void {
   if (despesasBloqueadas) return
 
   const ocorrenciasAnteriores = despesa.ocorrenciasRegistradas
@@ -361,8 +356,7 @@ function registrarOcorrencia(
   atualizarListaMeses()
   renderizarLista()
   atualizarResumo()
-  previsaoStatus.textContent =
-    `${despesa.titulo} registrada em ${formatarData(data)}.`
+  previsaoStatus.textContent = `${despesa.titulo} registrada em ${formatarData(data)}.`
 }
 
 function renderizarPrevisao(): void {
@@ -413,8 +407,7 @@ function renderizarPrevisao(): void {
 
       const info = document.createElement("span")
       info.className = "forecast-item-info"
-      info.textContent =
-        `${formatarData(ocorrencia.data)} · ${nomesCategoria[ocorrencia.despesa.categoria]}`
+      info.textContent = `${formatarData(ocorrencia.data)} · ${nomesCategoria[ocorrencia.despesa.categoria]}`
 
       const valor = document.createElement("span")
       valor.className = "forecast-item-value"
@@ -540,7 +533,8 @@ function atualizarGraficoCategorias(despesasVisiveis: Despesa[]): void {
     const barra = document.createElement("span")
     barra.className = "chart-bar"
     barra.dataset.chartCategory = item.categoria
-    barra.style.width = maiorTotal > 0 ? `${(item.total / maiorTotal) * 100}%` : "0%"
+    barra.style.width =
+      maiorTotal > 0 ? `${(item.total / maiorTotal) * 100}%` : "0%"
     track.append(barra)
 
     const valor = document.createElement("strong")
@@ -594,8 +588,7 @@ function atualizarGraficoEvolucao(): void {
 
     const rotulo = document.createElement("span")
     rotulo.className = "trend-label"
-    rotulo.textContent =
-      `${mes.data.toLocaleDateString("pt-BR", { month: "short" }).replace(/\.$/, "")}/${String(mes.data.getFullYear()).slice(-2)}`
+    rotulo.textContent = `${mes.data.toLocaleDateString("pt-BR", { month: "short" }).replace(/\.$/, "")}/${String(mes.data.getFullYear()).slice(-2)}`
 
     const trilha = document.createElement("div")
     trilha.className = "trend-track"
@@ -630,8 +623,7 @@ function atualizarGraficoEvolucao(): void {
   }
 
   if (mesAnterior.total === 0) {
-    comparacaoEvolucao.textContent =
-      `Sem gastos em ${nomeMesAnterior}; ${formatadorMoeda.format(mesAtual.total)} no mês atual.`
+    comparacaoEvolucao.textContent = `Sem gastos em ${nomeMesAnterior}; ${formatadorMoeda.format(mesAtual.total)} no mês atual.`
     return
   }
 
@@ -639,8 +631,7 @@ function atualizarGraficoEvolucao(): void {
   const percentual = Number(((diferenca / mesAnterior.total) * 100).toFixed(1))
   const direcao = mesAtual.total > mesAnterior.total ? "Aumento" : "Queda"
   const detalhePercentual = percentual > 0 ? ` (${percentual}%)` : ""
-  comparacaoEvolucao.textContent =
-    `${direcao} de ${formatadorMoeda.format(diferenca)}${detalhePercentual} em relação a ${nomeMesAnterior}.`
+  comparacaoEvolucao.textContent = `${direcao} de ${formatadorMoeda.format(diferenca)}${detalhePercentual} em relação a ${nomeMesAnterior}.`
 }
 
 function inicializarLimitesCategoria(): void {
@@ -679,7 +670,10 @@ function inicializarLimitesCategoria(): void {
     const barra = document.createElement("div")
     barra.className = "category-budget-progress"
     barra.setAttribute("role", "progressbar")
-    barra.setAttribute("aria-label", `Uso do limite de ${nomesCategoria[categoria]}`)
+    barra.setAttribute(
+      "aria-label",
+      `Uso do limite de ${nomesCategoria[categoria]}`,
+    )
     barra.setAttribute("aria-valuemin", "0")
     barra.setAttribute("aria-valuemax", "100")
     barra.setAttribute("aria-valuenow", "0")
@@ -717,10 +711,9 @@ function atualizarLimitesCategoria(mes: string): void {
     const preenchimento = progressoLinha?.querySelector<HTMLSpanElement>(
       ".category-budget-progress-fill",
     )
-    const percentualElemento =
-      progressoLinha?.querySelector<HTMLSpanElement>(
-        ".category-budget-percent",
-      )
+    const percentualElemento = progressoLinha?.querySelector<HTMLSpanElement>(
+      ".category-budget-percent",
+    )
     const status = listaLimitesCategoria.querySelector<HTMLParagraphElement>(
       `[data-status-categoria="${categoria}"]`,
     )
@@ -754,14 +747,8 @@ function atualizarLimitesCategoria(mes: string): void {
     progressoLinha.hidden = false
     preenchimento.style.width = `${Math.min(percentualPreciso, 100)}%`
     percentualElemento.textContent = `${percentual}%`
-    barra.setAttribute(
-      "aria-valuenow",
-      String(Math.min(percentual, 100)),
-    )
-    barra.setAttribute(
-      "aria-valuetext",
-      `${percentual}% do limite utilizado`,
-    )
+    barra.setAttribute("aria-valuenow", String(Math.min(percentual, 100)))
+    barra.setAttribute("aria-valuetext", `${percentual}% do limite utilizado`)
     barra.classList.toggle(
       "is-near",
       percentualPreciso >= 80 && percentualPreciso < 100,
@@ -774,13 +761,11 @@ function atualizarLimitesCategoria(mes: string): void {
     status.classList.toggle("is-over", percentualPreciso >= 100)
 
     if (total > limite) {
-      status.textContent =
-        `Limite ultrapassado em ${formatadorMoeda.format(total - limite)}.`
+      status.textContent = `Limite ultrapassado em ${formatadorMoeda.format(total - limite)}.`
     } else if (total === limite) {
       status.textContent = "Limite atingido."
     } else {
-      status.textContent =
-        `${formatadorMoeda.format(total)} de ${formatadorMoeda.format(limite)} · restam ${formatadorMoeda.format(limite - total)}.`
+      status.textContent = `${formatadorMoeda.format(total)} de ${formatadorMoeda.format(limite)} · restam ${formatadorMoeda.format(limite - total)}.`
     }
   }
 }
@@ -796,13 +781,24 @@ function atualizarAlertas(): void {
   const metaMensal = Number(inputMetaMensal.value || 0)
   const hoje = new Date()
   const mesAtual = obterDataISOlocal().slice(0, 7)
-  const alertas: Array<{ nivel: "alerta" | "warning" | "sucesso"; titulo: string; texto: string }> = []
+  const alertas: Array<{
+    nivel: "alerta" | "warning" | "sucesso"
+    titulo: string
+    texto: string
+  }> = []
 
   if (metaMensal > 0) {
     const restante = metaMensal - totalMes
     if (mesEmFoco === mesAtual) {
-      const ultimoDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-      const diasRestantes = Math.max(ultimoDiaDoMes.getDate() - hoje.getDate(), 1)
+      const ultimoDiaDoMes = new Date(
+        hoje.getFullYear(),
+        hoje.getMonth() + 1,
+        0,
+      )
+      const diasRestantes = Math.max(
+        ultimoDiaDoMes.getDate() - hoje.getDate(),
+        1,
+      )
       const gastoDiario = totalMes / Math.max(hoje.getDate(), 1)
       const projecao = gastoDiario * ultimoDiaDoMes.getDate()
 
@@ -879,7 +875,8 @@ function atualizarAlertas(): void {
     const item = document.createElement("li")
     item.className = "insight-item insight-sucesso"
     const texto = document.createElement("span")
-    texto.textContent = "Tudo em ordem por enquanto. Continue acompanhando o mês."
+    texto.textContent =
+      "Tudo em ordem por enquanto. Continue acompanhando o mês."
     item.append(texto)
     alertasFinanceiros.append(item)
     return
@@ -891,7 +888,8 @@ function atualizarAlertas(): void {
 
     const icone = document.createElement("span")
     icone.className = "insight-icon"
-    icone.textContent = alerta.nivel === "alerta" ? "!" : alerta.nivel === "warning" ? "•" : "✓"
+    icone.textContent =
+      alerta.nivel === "alerta" ? "!" : alerta.nivel === "warning" ? "•" : "✓"
 
     const conteudo = document.createElement("div")
     conteudo.className = "insight-content"
@@ -1015,7 +1013,10 @@ function atualizarResumo(): void {
     preenchimentoMetaMensal.style.width = "0%"
     percentualMetaMensal.textContent = "0%"
     barraMetaMensal.setAttribute("aria-valuenow", "0")
-    barraMetaMensal.setAttribute("aria-valuetext", "0% da meta mensal utilizado")
+    barraMetaMensal.setAttribute(
+      "aria-valuetext",
+      "0% da meta mensal utilizado",
+    )
     barraMetaMensal.classList.remove("is-near", "is-over")
     statusMetaMensal.textContent =
       "Defina uma meta para acompanhar seu orçamento."
@@ -1138,10 +1139,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   botaoRepetir.type = "button"
   botaoRepetir.disabled = despesasBloqueadas
   botaoRepetir.textContent = "Repetir"
-  botaoRepetir.setAttribute(
-    "aria-label",
-    `Repetir despesa: ${despesa.titulo}`,
-  )
+  botaoRepetir.setAttribute("aria-label", `Repetir despesa: ${despesa.titulo}`)
   botaoRepetir.addEventListener("click", () => {
     repetirDespesa(despesa)
   })
@@ -1297,7 +1295,10 @@ function confirmarImportacaoCsv(): void {
   despesas.push(...novasDespesas)
 
   if (!salvarDespesas()) {
-    despesas.splice(despesas.length - novasDespesas.length, novasDespesas.length)
+    despesas.splice(
+      despesas.length - novasDespesas.length,
+      novasDespesas.length,
+    )
     statusBackup.textContent =
       "Não foi possível salvar as despesas importadas. Os dados atuais foram preservados."
     dialogImportarCsv.close()
@@ -1437,11 +1438,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   if (!CATEGORIAS.some((categoria) => categoria === categoriaSelecionada)) {
     camposInvalidos.push(categoriaInput)
   }
-  if (
-    !FORMAS_PAGAMENTO.some(
-      (forma) => forma === formaPagamentoSelecionada,
-    )
-  ) {
+  if (!FORMAS_PAGAMENTO.some((forma) => forma === formaPagamentoSelecionada)) {
     camposInvalidos.push(formaPagamentoInput)
   }
 
@@ -1464,6 +1461,18 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     frequencia: recorrente ? frequenciaSelecionada : undefined,
   }
 
+  const duplicata = encontrarDespesaDuplicada(
+    despesas,
+    novaDespesa,
+    despesaEmEdicaoId ?? undefined,
+  )
+
+  if (duplicata) {
+    mensagemFormulario.textContent = `Já existe uma despesa igual para ${duplicata.titulo} em ${formatarData(duplicata.data)}. Revise os dados antes de salvar.`
+    tituloInput.focus()
+    return
+  }
+
   if (despesaEmEdicaoId) {
     const despesa = despesas.find((item) => item.id === despesaEmEdicaoId)
 
@@ -1471,8 +1480,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesa.titulo = titulo
       despesa.valor = valor
       despesa.categoria = categoriaSelecionada as Categoria
-      despesa.formaPagamento =
-        formaPagamentoSelecionada as FormaPagamento
+      despesa.formaPagamento = formaPagamentoSelecionada as FormaPagamento
       despesa.data = data
       despesa.recorrente = recorrente
       despesa.frequencia = recorrente ? frequenciaSelecionada : undefined
@@ -1526,8 +1534,7 @@ function atualizarAvisoArmazenamento(): void {
   }
   botaoExportarBackup.disabled = despesasBloqueadas
   botaoImportarCsv.disabled = despesasBloqueadas
-  botaoExportar.disabled =
-    despesasBloqueadas || despesas.length === 0
+  botaoExportar.disabled = despesasBloqueadas || despesas.length === 0
 }
 
 function exportarDadosBrutos(): void {
@@ -1546,14 +1553,15 @@ function exportarDadosBrutos(): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-checkboxDespesaRecorrente.addEventListener("change", atualizarVisibilidadeRecorrencia)
+checkboxDespesaRecorrente.addEventListener(
+  "change",
+  atualizarVisibilidadeRecorrencia,
+)
 listaLimitesCategoria.addEventListener("input", (evento: Event) => {
   const input = evento.target
   if (!(input instanceof HTMLInputElement)) return
 
-  const categoria = CATEGORIAS.find(
-    (item) => item === input.dataset.categoria,
-  )
+  const categoria = CATEGORIAS.find((item) => item === input.dataset.categoria)
   if (!categoria) return
 
   const limite = input.value === "" ? 0 : Number(input.value)
@@ -1618,10 +1626,7 @@ arquivoCsv.addEventListener("change", async () => {
     arquivoCsv.value = ""
   }
 })
-botaoConfirmarImportacaoCsv.addEventListener(
-  "click",
-  confirmarImportacaoCsv,
-)
+botaoConfirmarImportacaoCsv.addEventListener("click", confirmarImportacaoCsv)
 botaoCancelarImportacaoCsv.addEventListener("click", () => {
   dialogImportarCsv.close()
 })
