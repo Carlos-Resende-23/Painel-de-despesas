@@ -204,7 +204,7 @@
                 />
               </div>
               <div class="field">
-                <label for="valor">Valor</label>
+                <label id="valor-label" for="valor">Valor</label>
                 <div class="amount-input">
                   <span aria-hidden="true">R$</span>
                   <input
@@ -281,6 +281,31 @@
                   <option value="anual">Anual</option>
                 </select>
               </div>
+              <div class="field field-recorrente">
+                <label class="recorrente-toggle" for="despesa-parcelada">
+                  <input
+                    id="despesa-parcelada"
+                    name="despesa-parcelada"
+                    type="checkbox"
+                  />
+                  <span>Compra parcelada</span>
+                </label>
+                <input
+                  id="total-parcelas"
+                  class="frequencia-recorrencia"
+                  type="number"
+                  min="2"
+                  max="120"
+                  step="1"
+                  inputmode="numeric"
+                  value="2"
+                  aria-label="Quantidade total de parcelas"
+                  hidden
+                />
+                <small id="parcelamento-ajuda" class="field-hint" hidden>
+                  O valor é por parcela; a primeira será lançada na data escolhida.
+                </small>
+              </div>
             </div>
             <div class="form-actions">
               <p
@@ -317,11 +342,11 @@
             </p>
           </div>
           <p class="forecast-description">
-            Uma estimativa das despesas recorrentes. Registre cada ocorrência
-            quando ela for paga.
+            Uma estimativa das despesas recorrentes e das próximas parcelas.
+            Registre cada pagamento quando ele for realizado.
           </p>
           <p id="previsao-vazia" class="forecast-empty" hidden>
-            Nenhuma despesa recorrente prevista para os próximos 6 meses.
+            Nenhuma despesa recorrente ou parcela prevista para os próximos 6 meses.
           </p>
           <div id="previsao-lista" class="forecast-list"></div>
           <p

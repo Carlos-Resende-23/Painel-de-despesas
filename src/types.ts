@@ -20,6 +20,15 @@ export type FrequenciaRecorrencia = (typeof FREQUENCIAS)[number]
 export type FormaPagamento = (typeof FORMAS_PAGAMENTO)[number]
 export type OrdenacaoDespesas = (typeof ORDENACOES_DESPESAS)[number]
 export type LimitesCategoria = Partial<Record<Categoria, number>>
+export type Parcelamento = {
+  totalParcelas: number
+  parcelasPagas: number
+}
+export type Parcela = {
+  grupoId: string
+  numero: number
+  total: number
+}
 
 export type Despesa = {
   id: string
@@ -31,4 +40,6 @@ export type Despesa = {
   recorrente?: boolean
   frequencia?: FrequenciaRecorrencia
   ocorrenciasRegistradas?: string[]
+  parcelamento?: Parcelamento
+  parcela?: Parcela
 }

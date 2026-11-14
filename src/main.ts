@@ -226,6 +226,14 @@ const percentualMetaMensal = selecionarElemento<HTMLSpanElement>(
 const checkboxDespesaRecorrente = selecionarElemento<HTMLInputElement>(
   "#despesa-recorrente",
 )
+const checkboxDespesaParcelada = selecionarElemento<HTMLInputElement>(
+  "#despesa-parcelada",
+)
+const totalParcelasInput =
+  selecionarElemento<HTMLInputElement>("#total-parcelas")
+const ajudaParcelamento =
+  selecionarElemento<HTMLElement>("#parcelamento-ajuda")
+const rotuloValor = selecionarElemento<HTMLLabelElement>("#valor-label")
 const frequenciaRecorrencia = selecionarElemento<HTMLSelectElement>(
   "#frequencia-recorrencia",
 )
@@ -261,6 +269,7 @@ const comparacaoEvolucao =
   selecionarElemento<HTMLParagraphElement>("#trend-comparison")
 
 let despesaEmEdicaoId: string | null = null
+let parcelaEmEdicaoBloqueada = false
 let importacaoCsvPendente: ReturnType<typeof analisarImportacaoCsv> | null =
   null
 
@@ -326,12 +335,30 @@ function obterOcorrenciasPrevistas(): OcorrenciaPrevista[] {
   return calcularOcorrenciasPrevistas(despesas)
 }
 
-function registrarOcorrencia(despesa: Despesa, data: string): void {
+function registrarOcorrencia(
+  despesa: Despesa,
+  data: string,
+  numeroParcela?: number,
+): void {
   if (despesasBloqueadas) return
 
   const ocorrenciasAnteriores = despesa.ocorrenciasRegistradas
-  despesa.ocorrenciasRegistradas = [...(ocorrenciasAnteriores ?? []), data]
-  despesas.push({
+  const parcelasPagasAnteriores = despesa.parcelamento?.parcelasPagas
+  if (typeof numeroParcela === "number") {
+    if (
+      !despesa.parcelamento ||
+      numeroParcela !== despesa.parcelamento.parcelasPagas + 1 ||
+      numeroParcela > despesa.parcelamento.totalParcelas
+    ) {
+      previsaoStatus.textContent =
+        "Esta parcela não está mais disponível para registro. Atualize a previsão."
+      return
+    }
+    despesa.parcelamento.parcelasPagas = numeroParcela
+  } else {
+    despesa.ocorrenciasRegistradas = [...(ocorrenciasAnteriores ?? []), data]
+  }
+  const despesaRegistrada: Despesa = {
     id: crypto.randomUUID(),
     titulo: despesa.titulo,
     valor: despesa.valor,
@@ -339,14 +366,26 @@ function registrarOcorrencia(despesa: Despesa, data: string): void {
     formaPagamento: despesa.formaPagamento,
     data,
     recorrente: false,
-  })
+  }
+  if (typeof numeroParcela === "number" && despesa.parcelamento) {
+    despesaRegistrada.parcela = {
+      grupoId: despesa.id,
+      numero: numeroParcela,
+      total: despesa.parcelamento.totalParcelas,
+    }
+  }
+  despesas.push(despesaRegistrada)
 
   if (!salvarDespesas()) {
     despesas.pop()
-    if (ocorrenciasAnteriores) {
-      despesa.ocorrenciasRegistradas = ocorrenciasAnteriores
+    if (typeof numeroParcela === "number" && despesa.parcelamento) {
+      despesa.parcelamento.parcelasPagas = parcelasPagasAnteriores ?? 1
     } else {
-      delete despesa.ocorrenciasRegistradas
+      if (ocorrenciasAnteriores) {
+        despesa.ocorrenciasRegistradas = ocorrenciasAnteriores
+      } else {
+        delete despesa.ocorrenciasRegistradas
+      }
     }
     previsaoStatus.textContent =
       "Não foi possível registrar a ocorrência. Os dados não foram alterados."
@@ -407,7 +446,11 @@ function renderizarPrevisao(): void {
 
       const info = document.createElement("span")
       info.className = "forecast-item-info"
-      info.textContent = `${formatarData(ocorrencia.data)} · ${nomesCategoria[ocorrencia.despesa.categoria]}`
+      const detalheParcela =
+        typeof ocorrencia.parcela === "number"
+          ? ` · Parcela ${ocorrencia.parcela}/${ocorrencia.despesa.parcelamento?.totalParcelas}`
+          : ""
+      info.textContent = `${formatarData(ocorrencia.data)} · ${nomesCategoria[ocorrencia.despesa.categoria]}${detalheParcela}`
 
       const valor = document.createElement("span")
       valor.className = "forecast-item-value"
@@ -416,14 +459,22 @@ function renderizarPrevisao(): void {
       const botaoRegistrar = document.createElement("button")
       botaoRegistrar.className = "forecast-register"
       botaoRegistrar.type = "button"
-      botaoRegistrar.disabled = despesasBloqueadas
-      botaoRegistrar.textContent = "Registrar pagamento"
+      const parcelaDisponivel =
+        ocorrencia.parcelaDisponivel !== false
+      botaoRegistrar.disabled = despesasBloqueadas || !parcelaDisponivel
+      botaoRegistrar.textContent = parcelaDisponivel
+        ? "Registrar pagamento"
+        : "Aguardando parcela anterior"
       botaoRegistrar.setAttribute(
         "aria-label",
-        `Registrar ${ocorrencia.despesa.titulo} de ${formatadorMoeda.format(ocorrencia.despesa.valor)} em ${formatarData(ocorrencia.data)}`,
+        `Registrar ${ocorrencia.despesa.titulo}${typeof ocorrencia.parcela === "number" ? `, parcela ${ocorrencia.parcela} de ${ocorrencia.despesa.parcelamento?.totalParcelas}` : ""} de ${formatadorMoeda.format(ocorrencia.despesa.valor)} em ${formatarData(ocorrencia.data)}`,
       )
       botaoRegistrar.addEventListener("click", () => {
-        registrarOcorrencia(ocorrencia.despesa, ocorrencia.data)
+        registrarOcorrencia(
+          ocorrencia.despesa,
+          ocorrencia.data,
+          ocorrencia.parcela,
+        )
       })
 
       detalhes.append(titulo, info)
@@ -865,7 +916,7 @@ function atualizarAlertas(): void {
     alertas.push({
       nivel: "sucesso",
       titulo: "Próximos 6 meses",
-      texto: `Há ${formatadorMoeda.format(recorrentesPrevistos)} em despesas recorrentes previstas.`,
+      texto: `Há ${formatadorMoeda.format(recorrentesPrevistos)} em despesas e parcelas previstas.`,
     })
   }
 
@@ -1034,19 +1085,30 @@ function salvarDespesas(): boolean {
   }
 }
 
-function atualizarVisibilidadeRecorrencia(): void {
+function atualizarVisibilidadeTiposDespesa(): void {
   const recorrente = checkboxDespesaRecorrente.checked
+  const parcelada = checkboxDespesaParcelada.checked
   frequenciaRecorrencia.hidden = !recorrente
-  frequenciaRecorrencia.disabled = !recorrente
+  frequenciaRecorrencia.disabled = !recorrente || parcelaEmEdicaoBloqueada
+  totalParcelasInput.hidden = !parcelada
+  totalParcelasInput.disabled =
+    !parcelada || parcelaEmEdicaoBloqueada
+  ajudaParcelamento.hidden = !parcelada
+  rotuloValor.textContent = parcelada ? "Valor da parcela" : "Valor"
+  checkboxDespesaRecorrente.disabled = parcelaEmEdicaoBloqueada
+  checkboxDespesaParcelada.disabled = parcelaEmEdicaoBloqueada
 }
 
 function limparFormulario(): void {
   form.reset()
   dataInput.value = obterDataISOlocal()
   checkboxDespesaRecorrente.checked = false
+  checkboxDespesaParcelada.checked = false
   frequenciaRecorrencia.value = "mensal"
+  totalParcelasInput.value = "2"
   formaPagamentoInput.value = ""
-  atualizarVisibilidadeRecorrencia()
+  parcelaEmEdicaoBloqueada = false
+  atualizarVisibilidadeTiposDespesa()
   despesaEmEdicaoId = null
   botaoSubmit.textContent = "Adicionar despesa"
   botaoCancelarEdicao.hidden = true
@@ -1059,8 +1121,13 @@ function preencherFormulario(despesa: Despesa): void {
   categoriaInput.value = despesa.categoria
   formaPagamentoInput.value = despesa.formaPagamento ?? ""
   checkboxDespesaRecorrente.checked = Boolean(despesa.recorrente)
+  checkboxDespesaParcelada.checked = Boolean(despesa.parcelamento)
+  totalParcelasInput.value = String(
+    despesa.parcelamento?.totalParcelas ?? 2,
+  )
   frequenciaRecorrencia.value = despesa.frequencia ?? "mensal"
-  atualizarVisibilidadeRecorrencia()
+  parcelaEmEdicaoBloqueada = Boolean(despesa.parcela)
+  atualizarVisibilidadeTiposDespesa()
 }
 
 function repetirDespesa(despesa: Despesa): void {
@@ -1069,8 +1136,11 @@ function repetirDespesa(despesa: Despesa): void {
   preencherFormulario(despesa)
   dataInput.value = obterDataISOlocal()
   checkboxDespesaRecorrente.checked = false
+  checkboxDespesaParcelada.checked = false
   frequenciaRecorrencia.value = "mensal"
-  atualizarVisibilidadeRecorrencia()
+  totalParcelasInput.value = "2"
+  parcelaEmEdicaoBloqueada = false
+  atualizarVisibilidadeTiposDespesa()
   botaoSubmit.textContent = "Adicionar despesa"
   botaoCancelarEdicao.hidden = true
   mensagemFormulario.textContent =
@@ -1097,9 +1167,13 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
 
   const recorrencia = document.createElement("span")
   recorrencia.className = "recurrence-badge"
-  recorrencia.textContent = despesa.recorrente
-    ? `Recorrente · ${obterNomeFrequencia(despesa.frequencia)}`
-    : "Única"
+  recorrencia.textContent = despesa.parcelamento
+    ? `Parcelamento · 1/${despesa.parcelamento.totalParcelas}`
+    : despesa.parcela
+      ? `Parcela ${despesa.parcela.numero}/${despesa.parcela.total}`
+      : despesa.recorrente
+        ? `Recorrente · ${obterNomeFrequencia(despesa.frequencia)}`
+        : "Única"
 
   const pagamento = document.createElement("span")
   pagamento.className = "recurrence-badge"
@@ -1409,6 +1483,7 @@ function limparErros(): void {
     dataInput,
     categoriaInput,
     formaPagamentoInput,
+    totalParcelasInput,
   ]) {
     campo.removeAttribute("aria-invalid")
   }
@@ -1427,6 +1502,11 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   const categoriaSelecionada = categoriaInput.value
   const formaPagamentoSelecionada = formaPagamentoInput.value
   const recorrente = checkboxDespesaRecorrente.checked
+  const parcelada = checkboxDespesaParcelada.checked
+  const totalParcelas = Number(totalParcelasInput.value)
+  const despesaEmEdicao = despesas.find(
+    (item) => item.id === despesaEmEdicaoId,
+  )
   const frequenciaSelecionada = recorrente
     ? (frequenciaRecorrencia.value as FrequenciaRecorrencia)
     : undefined
@@ -1441,11 +1521,22 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   if (!FORMAS_PAGAMENTO.some((forma) => forma === formaPagamentoSelecionada)) {
     camposInvalidos.push(formaPagamentoInput)
   }
+  if (
+    parcelada &&
+    (!Number.isInteger(totalParcelas) ||
+      totalParcelas < 2 ||
+      totalParcelas > 120 ||
+      totalParcelas < (despesaEmEdicao?.parcelamento?.parcelasPagas ?? 1))
+  ) {
+    camposInvalidos.push(totalParcelasInput)
+  }
 
   if (camposInvalidos.length > 0) {
     camposInvalidos.forEach(marcarCampoInvalido)
     mensagemFormulario.textContent =
-      "Preencha título, valor maior que zero, data, categoria e forma de pagamento."
+      camposInvalidos.includes(totalParcelasInput)
+        ? "Informe entre 2 e 120 parcelas, sem reduzir para menos do que já foi pago."
+        : "Preencha título, valor maior que zero, data, categoria e forma de pagamento."
     camposInvalidos[0].focus()
     return
   }
@@ -1459,6 +1550,12 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     data,
     recorrente,
     frequencia: recorrente ? frequenciaSelecionada : undefined,
+  }
+  if (parcelada) {
+    novaDespesa.parcelamento = {
+      totalParcelas,
+      parcelasPagas: 1,
+    }
   }
 
   const duplicata = encontrarDespesaDuplicada(
@@ -1474,16 +1571,29 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   }
 
   if (despesaEmEdicaoId) {
-    const despesa = despesas.find((item) => item.id === despesaEmEdicaoId)
+    if (despesaEmEdicao) {
+      despesaEmEdicao.titulo = titulo
+      despesaEmEdicao.valor = valor
+      despesaEmEdicao.categoria = categoriaSelecionada as Categoria
+      despesaEmEdicao.formaPagamento =
+        formaPagamentoSelecionada as FormaPagamento
+      despesaEmEdicao.data = data
 
-    if (despesa) {
-      despesa.titulo = titulo
-      despesa.valor = valor
-      despesa.categoria = categoriaSelecionada as Categoria
-      despesa.formaPagamento = formaPagamentoSelecionada as FormaPagamento
-      despesa.data = data
-      despesa.recorrente = recorrente
-      despesa.frequencia = recorrente ? frequenciaSelecionada : undefined
+      if (!despesaEmEdicao.parcela) {
+        despesaEmEdicao.recorrente = recorrente
+        despesaEmEdicao.frequencia = recorrente
+          ? frequenciaSelecionada
+          : undefined
+        if (parcelada) {
+          despesaEmEdicao.parcelamento = {
+            totalParcelas,
+            parcelasPagas:
+              despesaEmEdicao.parcelamento?.parcelasPagas ?? 1,
+          }
+        } else {
+          delete despesaEmEdicao.parcelamento
+        }
+      }
     }
   } else {
     despesas.push(novaDespesa)
@@ -1553,10 +1663,18 @@ function exportarDadosBrutos(): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-checkboxDespesaRecorrente.addEventListener(
-  "change",
-  atualizarVisibilidadeRecorrencia,
-)
+checkboxDespesaRecorrente.addEventListener("change", () => {
+  if (checkboxDespesaRecorrente.checked) {
+    checkboxDespesaParcelada.checked = false
+  }
+  atualizarVisibilidadeTiposDespesa()
+})
+checkboxDespesaParcelada.addEventListener("change", () => {
+  if (checkboxDespesaParcelada.checked) {
+    checkboxDespesaRecorrente.checked = false
+  }
+  atualizarVisibilidadeTiposDespesa()
+})
 listaLimitesCategoria.addEventListener("input", (evento: Event) => {
   const input = evento.target
   if (!(input instanceof HTMLInputElement)) return
@@ -1647,7 +1765,7 @@ inputMetaMensal.value = String(carregarMetaMensal())
 
 atualizarAvisoArmazenamento()
 inicializarLimitesCategoria()
-atualizarVisibilidadeRecorrencia()
+atualizarVisibilidadeTiposDespesa()
 atualizarListaMeses()
 renderizarLista()
 atualizarResumo()

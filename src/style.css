@@ -742,6 +742,12 @@ h1 {
   font-weight: 650;
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .field input,
 .field select {
   width: 100%;

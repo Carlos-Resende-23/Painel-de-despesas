@@ -6,6 +6,7 @@ import {
   type Despesa,
   type LimitesCategoria,
   type OrdenacaoDespesas,
+  type Parcelamento,
 } from "./types.ts"
 
 export type Backup = {
@@ -30,6 +31,8 @@ export type ArmazenamentoBackup = Pick<
 export type OcorrenciaPrevista = {
   despesa: Despesa
   data: string
+  parcela?: number
+  parcelaDisponivel?: boolean
 }
 
 export type FiltroSomaDespesas = {
@@ -468,6 +471,44 @@ export function ehDataValida(data: string): boolean {
   )
 }
 
+function ehParcelamento(valor: unknown): valor is Parcelamento {
+  if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
+    return false
+  }
+
+  const parcelamento = valor as Record<string, unknown>
+  return (
+    Number.isInteger(parcelamento.totalParcelas) &&
+    typeof parcelamento.totalParcelas === "number" &&
+    parcelamento.totalParcelas >= 2 &&
+    parcelamento.totalParcelas <= 120 &&
+    Number.isInteger(parcelamento.parcelasPagas) &&
+    typeof parcelamento.parcelasPagas === "number" &&
+    parcelamento.parcelasPagas >= 1 &&
+    parcelamento.parcelasPagas <= parcelamento.totalParcelas
+  )
+}
+
+function ehParcela(valor: unknown): boolean {
+  if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
+    return false
+  }
+
+  const parcela = valor as Record<string, unknown>
+  return (
+    typeof parcela.grupoId === "string" &&
+    parcela.grupoId.trim().length > 0 &&
+    Number.isInteger(parcela.numero) &&
+    typeof parcela.numero === "number" &&
+    Number.isInteger(parcela.total) &&
+    typeof parcela.total === "number" &&
+    parcela.total >= 2 &&
+    parcela.total <= 120 &&
+    parcela.numero >= 1 &&
+    parcela.numero <= parcela.total
+  )
+}
+
 export function ehDespesa(valor: unknown): valor is Despesa {
   if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
     return false
@@ -493,6 +534,11 @@ export function ehDespesa(valor: unknown): valor is Despesa {
           /^\d{4}-\d{2}-\d{2}$/.test(data) &&
           ehDataValida(data),
       ))
+  const parcelamentoValido =
+    typeof registro.parcelamento === "undefined" ||
+    ehParcelamento(registro.parcelamento)
+  const parcelaValida =
+    typeof registro.parcela === "undefined" || ehParcela(registro.parcela)
 
   return (
     typeof registro.id === "string" &&
@@ -507,7 +553,10 @@ export function ehDespesa(valor: unknown): valor is Despesa {
     dataValida &&
     recorrenteValido &&
     frequenciaValida &&
-    ocorrenciasRegistradasValidas
+    ocorrenciasRegistradasValidas &&
+    parcelamentoValido &&
+    parcelaValida &&
+    !(registro.recorrente && registro.parcelamento !== undefined)
   )
 }
 
@@ -741,32 +790,62 @@ export function calcularOcorrenciasPrevistas(
   const ocorrencias: OcorrenciaPrevista[] = []
 
   for (const despesa of despesas) {
-    if (!despesa.recorrente) continue
-
     const dataBase = normalizarData(despesa.data, hoje)
     const [anoBase, mesBase, diaBase] = dataBase.split("-").map(Number)
     const mesBaseIndice = anoBase * 12 + mesBase - 1
-    const intervalo =
-      despesa.frequencia === "anual"
-        ? 12
-        : despesa.frequencia === "trimestral"
-          ? 3
-          : 1
-    const ocorrenciasRegistradas = new Set(despesa.ocorrenciasRegistradas ?? [])
+    if (despesa.recorrente) {
+      const intervalo =
+        despesa.frequencia === "anual"
+          ? 12
+          : despesa.frequencia === "trimestral"
+            ? 3
+            : 1
+      const ocorrenciasRegistradas = new Set(
+        despesa.ocorrenciasRegistradas ?? [],
+      )
 
-    for (let deslocamento = 0; deslocamento < 6; deslocamento += 1) {
-      const indiceMes = mesAtualIndice + deslocamento
-      const mesesDesdeBase = indiceMes - mesBaseIndice
-      if (mesesDesdeBase <= 0 || mesesDesdeBase % intervalo !== 0) continue
+      for (let deslocamento = 0; deslocamento < 6; deslocamento += 1) {
+        const indiceMes = mesAtualIndice + deslocamento
+        const mesesDesdeBase = indiceMes - mesBaseIndice
+        if (mesesDesdeBase <= 0 || mesesDesdeBase % intervalo !== 0) continue
 
-      const ano = Math.floor(indiceMes / 12)
-      const mes = indiceMes % 12
-      const ultimoDia = new Date(ano, mes + 1, 0).getDate()
-      const dia = Math.min(diaBase, ultimoDia)
-      const data = dataISOlocal(new Date(ano, mes, dia))
+        const ano = Math.floor(indiceMes / 12)
+        const mes = indiceMes % 12
+        const ultimoDia = new Date(ano, mes + 1, 0).getDate()
+        const dia = Math.min(diaBase, ultimoDia)
+        const data = dataISOlocal(new Date(ano, mes, dia))
 
-      if (data >= hoje && !ocorrenciasRegistradas.has(data)) {
-        ocorrencias.push({ despesa, data })
+        if (data >= hoje && !ocorrenciasRegistradas.has(data)) {
+          ocorrencias.push({ despesa, data })
+        }
+      }
+    }
+
+    const parcelamento = despesa.parcelamento
+    if (parcelamento && parcelamento.parcelasPagas < parcelamento.totalParcelas) {
+      for (
+        let numeroParcela = parcelamento.parcelasPagas + 1;
+        numeroParcela <= parcelamento.totalParcelas;
+        numeroParcela += 1
+      ) {
+        const indiceMes = mesBaseIndice + numeroParcela - 1
+        const mesesDesdeHoje = indiceMes - mesAtualIndice
+        if (mesesDesdeHoje >= 6) break
+
+        const ano = Math.floor(indiceMes / 12)
+        const mes = indiceMes % 12
+        const ultimoDia = new Date(ano, mes + 1, 0).getDate()
+        const dia = Math.min(diaBase, ultimoDia)
+        const data = dataISOlocal(new Date(ano, mes, dia))
+
+        ocorrencias.push({
+          despesa,
+          data,
+          parcela: numeroParcela,
+          parcelaDisponivel: numeroParcela === parcelamento.parcelasPagas + 1,
+        })
+
+        if (mesesDesdeHoje < 0 || data < hoje) break
       }
     }
   }

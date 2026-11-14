@@ -435,6 +435,66 @@ test("prevê frequências trimestrais e anuais, omitindo ocorrências pagas", ()
   )
 })
 
+test("prevê parcelas do semestre, avança após pagamento e encerra no total", () => {
+  const parcelada = criarDespesa({
+    id: "compra-parcelada",
+    titulo: "Notebook",
+    valor: 250,
+    data: "2026-01-31",
+    parcelamento: { totalParcelas: 3, parcelasPagas: 1 },
+  })
+
+  assert.deepEqual(
+    calcularOcorrenciasPrevistas([parcelada], "2026-02-01").map(
+      ({ data, parcela, parcelaDisponivel }) => [
+        data,
+        parcela,
+        parcelaDisponivel,
+      ],
+    ),
+    [
+      ["2026-02-28", 2, true],
+      ["2026-03-31", 3, false],
+    ],
+  )
+
+  parcelada.parcelamento!.parcelasPagas = 2
+  assert.deepEqual(
+    calcularOcorrenciasPrevistas([parcelada], "2026-03-01").map(
+      ({ data, parcela, parcelaDisponivel }) => [
+        data,
+        parcela,
+        parcelaDisponivel,
+      ],
+    ),
+    [["2026-03-31", 3, true]],
+  )
+
+  parcelada.parcelamento!.parcelasPagas = 3
+  assert.deepEqual(calcularOcorrenciasPrevistas([parcelada], "2026-04-01"), [])
+})
+
+test("valida dados de parcelamento e rejeita combinações incoerentes", () => {
+  const parcelada = criarDespesa({
+    parcelamento: { totalParcelas: 10, parcelasPagas: 1 },
+  })
+  assert.equal(ehDespesa(parcelada), true)
+  assert.equal(
+    ehDespesa({
+      ...parcelada,
+      parcelamento: { totalParcelas: 10, parcelasPagas: 11 },
+    }),
+    false,
+  )
+  assert.equal(
+    ehDespesa({
+      ...parcelada,
+      recorrente: true,
+    }),
+    false,
+  )
+})
+
 test("importa todas as partes do backup, removendo limites ausentes", () => {
   const armazenamento = criarArmazenamentoAnterior()
   const backup = criarBackup()

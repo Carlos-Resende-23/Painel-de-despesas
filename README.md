@@ -13,7 +13,9 @@ altera os gastos realizados: use
 **Registrar pagamento** quando uma ocorrência for paga para adicioná-la à
 lista sem duplicá-la. Use **Repetir** em um lançamento para copiar seus dados
 ao formulário com a data de hoje e criar uma nova despesa após revisar e
-salvar. Você também pode definir **limites mensais por
+salvar. Compras parceladas aceitam de 2 a 120 parcelas: o valor informado é o
+valor de cada parcela, a primeira é lançada na data escolhida e as seguintes
+aparecem na previsão até o pagamento da última. Você também pode definir **limites mensais por
 categoria**; o painel acompanha o progresso no mês selecionado e sinaliza
 quando o limite está próximo ou foi ultrapassado. Para transferir ou proteger esses dados, use
 **Exportar backup** para baixar um arquivo JSON e **Importar backup** para
