@@ -249,6 +249,8 @@ const filtroPagamento =
 const ordenacaoLista = selecionarElemento<HTMLSelectElement>(
   "#ordenacao-despesas",
 )
+const botaoLimparFiltros =
+  selecionarElemento<HTMLButtonElement>("#limpar-filtros")
 const totaisPorPagamento = selecionarElemento<HTMLUListElement>(
   "#totais-por-pagamento",
 )
@@ -1714,6 +1716,14 @@ filtroCategoria.addEventListener("change", atualizarDespesasFiltradas)
 filtroPagamento.addEventListener("change", atualizarDespesasFiltradas)
 filtroTexto.addEventListener("input", atualizarDespesasFiltradas)
 ordenacaoLista.addEventListener("change", atualizarDespesasFiltradas)
+botaoLimparFiltros.addEventListener("click", () => {
+  filtroMes.value = "todos"
+  filtroTexto.value = ""
+  filtroCategoria.value = "todas"
+  filtroPagamento.value = "todas"
+  ordenacaoLista.value = "recentes"
+  atualizarDespesasFiltradas()
+})
 
 botaoExportar.addEventListener("click", exportarDespesasVisiveis)
 botaoExportarBackup.addEventListener("click", exportarBackup)
