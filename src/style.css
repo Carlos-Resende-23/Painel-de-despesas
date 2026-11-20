@@ -1239,6 +1239,48 @@ h1 {
   display: none;
 }
 
+.undo-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  display: flex;
+  max-width: min(420px, calc(100vw - 48px));
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #fff;
+  background: var(--pine);
+  box-shadow: 0 12px 28px rgba(30, 48, 43, 0.22);
+  font-size: 12px;
+}
+
+.undo-toast[hidden] {
+  display: none;
+}
+
+.undo-toast button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--pine);
+  background: var(--lime);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.undo-toast button:focus-visible {
+  outline: 3px solid rgba(217, 237, 114, 0.45);
+  outline-offset: 3px;
+}
+
 .storage-recovery p {
   margin: 0;
 }

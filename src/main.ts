@@ -269,11 +269,25 @@ const previsaoStatus =
 const graficoEvolucao = selecionarElemento<HTMLDivElement>("#grafico-evolucao")
 const comparacaoEvolucao =
   selecionarElemento<HTMLParagraphElement>("#trend-comparison")
+const avisoDesfazerExclusao = selecionarElemento<HTMLDivElement>(
+  "#desfazer-exclusao",
+)
+const mensagemDesfazerExclusao = selecionarElemento<HTMLSpanElement>(
+  "#desfazer-exclusao-mensagem",
+)
+const botaoDesfazerExclusao = selecionarElemento<HTMLButtonElement>(
+  "#desfazer-exclusao-botao",
+)
 
 let despesaEmEdicaoId: string | null = null
 let parcelaEmEdicaoBloqueada = false
 let importacaoCsvPendente: ReturnType<typeof analisarImportacaoCsv> | null =
   null
+let exclusaoDesfazerPendente: {
+  despesa: Despesa
+  indice: number
+} | null = null
+let temporizadorDesfazerExclusao: number | null = null
 
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -1150,6 +1164,63 @@ function repetirDespesa(despesa: Despesa): void {
   tituloInput.focus()
 }
 
+function esconderOpcaoDesfazerExclusao(): void {
+  if (temporizadorDesfazerExclusao !== null) {
+    window.clearTimeout(temporizadorDesfazerExclusao)
+    temporizadorDesfazerExclusao = null
+  }
+  exclusaoDesfazerPendente = null
+  avisoDesfazerExclusao.hidden = true
+}
+
+function mostrarOpcaoDesfazerExclusao(
+  despesa: Despesa,
+  indice: number,
+  armazenamentoFalhou: boolean,
+): void {
+  if (temporizadorDesfazerExclusao !== null) {
+    window.clearTimeout(temporizadorDesfazerExclusao)
+  }
+
+  exclusaoDesfazerPendente = { despesa: { ...despesa }, indice }
+  mensagemDesfazerExclusao.textContent = armazenamentoFalhou
+    ? `${despesa.titulo} excluída nesta sessão.`
+    : `${despesa.titulo} excluída.`
+  avisoDesfazerExclusao.hidden = false
+  temporizadorDesfazerExclusao = window.setTimeout(() => {
+    esconderOpcaoDesfazerExclusao()
+  }, 8000)
+}
+
+botaoDesfazerExclusao.addEventListener("click", () => {
+  if (!exclusaoDesfazerPendente) return
+
+  const { despesa, indice } = exclusaoDesfazerPendente
+  despesas.splice(Math.min(indice, despesas.length), 0, { ...despesa })
+
+  if (!salvarDespesas()) {
+    const indiceRestaurado = despesas.findIndex(
+      (item) => item.id === despesa.id,
+    )
+    if (indiceRestaurado !== -1) {
+      despesas.splice(indiceRestaurado, 1)
+    }
+    mensagemDesfazerExclusao.textContent =
+      "Não foi possível desfazer a exclusão neste navegador."
+    window.clearTimeout(temporizadorDesfazerExclusao ?? undefined)
+    temporizadorDesfazerExclusao = window.setTimeout(() => {
+      esconderOpcaoDesfazerExclusao()
+    }, 3000)
+    return
+  }
+
+  esconderOpcaoDesfazerExclusao()
+  atualizarListaMeses()
+  renderizarLista()
+  atualizarResumo()
+  mensagemFormulario.textContent = "Exclusão desfeita."
+})
+
 function criarItemDespesa(despesa: Despesa): HTMLLIElement {
   const item = document.createElement("li")
   item.className = "expense-item"
@@ -1232,18 +1303,21 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
     )
     if (indice === -1) return
 
-    despesas.splice(indice, 1)
+    const [despesaExcluida] = despesas.splice(indice, 1)
 
     if (despesaEmEdicaoId === despesa.id) {
       limparFormulario()
     }
 
+    const armazenamentoFalhou = !salvarDespesas()
     renderizarLista()
     atualizarListaMeses()
     atualizarResumo()
-    mensagemFormulario.textContent = salvarDespesas()
-      ? "Despesa excluída."
-      : "Despesa excluída, mas não foi possível salvar a alteração neste navegador."
+    mostrarOpcaoDesfazerExclusao(
+      despesaExcluida,
+      indice,
+      armazenamentoFalhou,
+    )
   })
 
   detalhes.append(titulo, categoria, pagamento, recorrencia, data)
