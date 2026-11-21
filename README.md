@@ -47,3 +47,7 @@ Para executar os testes automatizados de cálculos, recorrências, importação 
 e backups, use
 `npm test`. O workflow do GitHub Pages executa esses testes antes de compilar e
 publicar o site.
+
+Os testes também cobrem os fluxos principais da interface em um DOM de navegador
+simulado: estado inicial, validação do formulário e cadastro persistido de uma
+despesa.
