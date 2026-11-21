@@ -150,6 +150,8 @@ const dataInput = selecionarElemento<HTMLInputElement>("#data-despesa")
 const categoriaInput = selecionarElemento<HTMLSelectElement>("#categoria")
 const formaPagamentoInput =
   selecionarElemento<HTMLSelectElement>("#forma-pagamento")
+const observacaoInput =
+  selecionarElemento<HTMLTextAreaElement>("#observacao")
 const mensagemFormulario = selecionarElemento<HTMLParagraphElement>(
   "#mensagem-formulario",
 )
@@ -380,6 +382,7 @@ function registrarOcorrencia(
     valor: despesa.valor,
     categoria: despesa.categoria,
     formaPagamento: despesa.formaPagamento,
+    observacao: despesa.observacao,
     data,
     recorrente: false,
   }
@@ -1123,6 +1126,7 @@ function limparFormulario(): void {
   frequenciaRecorrencia.value = "mensal"
   totalParcelasInput.value = "2"
   formaPagamentoInput.value = ""
+  observacaoInput.value = ""
   parcelaEmEdicaoBloqueada = false
   atualizarVisibilidadeTiposDespesa()
   despesaEmEdicaoId = null
@@ -1136,6 +1140,7 @@ function preencherFormulario(despesa: Despesa): void {
   dataInput.value = obterDataParaFormulario(despesa.data)
   categoriaInput.value = despesa.categoria
   formaPagamentoInput.value = despesa.formaPagamento ?? ""
+  observacaoInput.value = despesa.observacao ?? ""
   checkboxDespesaRecorrente.checked = Boolean(despesa.recorrente)
   checkboxDespesaParcelada.checked = Boolean(despesa.parcelamento)
   totalParcelasInput.value = String(
@@ -1254,6 +1259,11 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
     ? nomesFormaPagamento[despesa.formaPagamento]
     : "Não informado"
 
+  const observacao = document.createElement("p")
+  observacao.className = "expense-observation"
+  observacao.textContent = despesa.observacao ?? ""
+  observacao.hidden = !despesa.observacao
+
   const data = document.createElement("time")
   data.className = "expense-date"
   data.dateTime = obterDataParaFormulario(despesa.data)
@@ -1320,7 +1330,7 @@ function criarItemDespesa(despesa: Despesa): HTMLLIElement {
     )
   })
 
-  detalhes.append(titulo, categoria, pagamento, recorrencia, data)
+  detalhes.append(titulo, categoria, pagamento, recorrencia, data, observacao)
   acoes.append(valor, botaoEditar, botaoRepetir, botaoExcluir)
   item.append(detalhes, acoes)
   return item
@@ -1354,7 +1364,7 @@ function exportarDespesasVisiveis(): void {
   if (despesasBloqueadas) return
 
   const linhas = [
-    ["Título", "Valor", "Categoria", "Forma de pagamento", "Data"],
+    ["Título", "Valor", "Categoria", "Forma de pagamento", "Data", "Observação"],
     ...obterDespesasOrdenadas().map((despesa) => [
       despesa.titulo,
       despesa.valor.toFixed(2).replace(".", ","),
@@ -1363,6 +1373,7 @@ function exportarDespesasVisiveis(): void {
         ? nomesFormaPagamento[despesa.formaPagamento]
         : "Não informado",
       formatarData(despesa.data),
+      despesa.observacao ?? "",
     ]),
   ]
   const conteudo = linhas
@@ -1547,7 +1558,7 @@ async function importarBackup(arquivo: File): Promise<void> {
 }
 
 function marcarCampoInvalido(
-  campo: HTMLInputElement | HTMLSelectElement,
+  campo: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
 ): void {
   campo.setAttribute("aria-invalid", "true")
 }
@@ -1559,6 +1570,7 @@ function limparErros(): void {
     dataInput,
     categoriaInput,
     formaPagamentoInput,
+    observacaoInput,
     totalParcelasInput,
   ]) {
     campo.removeAttribute("aria-invalid")
@@ -1577,6 +1589,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   const data = dataInput.value
   const categoriaSelecionada = categoriaInput.value
   const formaPagamentoSelecionada = formaPagamentoInput.value
+  const observacao = observacaoInput.value.trim()
   const recorrente = checkboxDespesaRecorrente.checked
   const parcelada = checkboxDespesaParcelada.checked
   const totalParcelas = Number(totalParcelasInput.value)
@@ -1586,7 +1599,9 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   const frequenciaSelecionada = recorrente
     ? (frequenciaRecorrencia.value as FrequenciaRecorrencia)
     : undefined
-  const camposInvalidos: Array<HTMLInputElement | HTMLSelectElement> = []
+  const camposInvalidos: Array<
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+  > = []
 
   if (!titulo) camposInvalidos.push(tituloInput)
   if (!Number.isFinite(valor) || valor <= 0) camposInvalidos.push(valorInput)
@@ -1597,6 +1612,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
   if (!FORMAS_PAGAMENTO.some((forma) => forma === formaPagamentoSelecionada)) {
     camposInvalidos.push(formaPagamentoInput)
   }
+  if (observacao.length > 500) camposInvalidos.push(observacaoInput)
   if (
     parcelada &&
     (!Number.isInteger(totalParcelas) ||
@@ -1612,6 +1628,8 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     mensagemFormulario.textContent =
       camposInvalidos.includes(totalParcelasInput)
         ? "Informe entre 2 e 120 parcelas, sem reduzir para menos do que já foi pago."
+        : camposInvalidos.includes(observacaoInput)
+          ? "A observação deve ter no máximo 500 caracteres."
         : "Preencha título, valor maior que zero, data, categoria e forma de pagamento."
     camposInvalidos[0].focus()
     return
@@ -1624,6 +1642,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
     categoria: categoriaSelecionada as Categoria,
     formaPagamento: formaPagamentoSelecionada as FormaPagamento,
     data,
+    ...(observacao ? { observacao } : {}),
     recorrente,
     frequencia: recorrente ? frequenciaSelecionada : undefined,
   }
@@ -1654,6 +1673,7 @@ form.addEventListener("submit", (evento: SubmitEvent) => {
       despesaEmEdicao.formaPagamento =
         formaPagamentoSelecionada as FormaPagamento
       despesaEmEdicao.data = data
+      despesaEmEdicao.observacao = observacao || undefined
 
       if (!despesaEmEdicao.parcela) {
         despesaEmEdicao.recorrente = recorrente
@@ -1714,8 +1734,8 @@ function atualizarAvisoArmazenamento(): void {
     !despesasBloqueadas || dadosDespesasBrutos === null
 
   for (const controle of form.querySelectorAll<
-    HTMLInputElement | HTMLSelectElement | HTMLButtonElement
-  >("input, select, button")) {
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement
+  >("input, select, textarea, button")) {
     controle.disabled = despesasBloqueadas
   }
   botaoExportarBackup.disabled = despesasBloqueadas

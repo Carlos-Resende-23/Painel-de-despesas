@@ -292,6 +292,12 @@ export function analisarImportacaoCsv(
       nome === "paymentmethod"
     ) {
       indices.set("pagamento", indice)
+    } else if (
+      nome === "observacao" ||
+      nome === "observacoes" ||
+      nome === "obs"
+    ) {
+      indices.set("observacao", indice)
     } else if (nome === "data" || nome === "date") {
       indices.set("data", indice)
     }
@@ -352,6 +358,7 @@ export function analisarImportacaoCsv(
     const formaPagamento = pagamentoCampo
       ? formasPagamento[normalizarCabecalhoCsv(pagamentoCampo)]
       : undefined
+    const observacao = valorCampo("observacao")
     const pagamentoValido =
       !pagamentoCampo ||
       Object.prototype.hasOwnProperty.call(
@@ -359,7 +366,14 @@ export function analisarImportacaoCsv(
         normalizarCabecalhoCsv(pagamentoCampo),
       )
 
-    if (!titulo || !valor || !categoria || !data || !pagamentoValido) {
+    if (
+      !titulo ||
+      !valor ||
+      !categoria ||
+      !data ||
+      !pagamentoValido ||
+      observacao.length > 500
+    ) {
       resultado.invalidas.push({
         linha: registro.linha,
         motivo: !titulo
@@ -370,7 +384,9 @@ export function analisarImportacaoCsv(
               ? "Categoria inválida."
               : !data
                 ? "Data inválida; use DD/MM/AAAA ou AAAA-MM-DD."
-                : "Forma de pagamento inválida.",
+                : !pagamentoValido
+                  ? "Forma de pagamento inválida."
+                  : "Observação deve ter no máximo 500 caracteres.",
       })
       continue
     }
@@ -381,6 +397,7 @@ export function analisarImportacaoCsv(
       categoria,
       formaPagamento,
       data,
+      ...(observacao ? { observacao } : {}),
     }
     const chave = chaveDespesaImportada(despesa)
     if (chavesExistentes.has(chave)) {
@@ -539,6 +556,10 @@ export function ehDespesa(valor: unknown): valor is Despesa {
     ehParcelamento(registro.parcelamento)
   const parcelaValida =
     typeof registro.parcela === "undefined" || ehParcela(registro.parcela)
+  const observacaoValida =
+    typeof registro.observacao === "undefined" ||
+    (typeof registro.observacao === "string" &&
+      registro.observacao.length <= 500)
 
   return (
     typeof registro.id === "string" &&
@@ -556,6 +577,7 @@ export function ehDespesa(valor: unknown): valor is Despesa {
     ocorrenciasRegistradasValidas &&
     parcelamentoValido &&
     parcelaValida &&
+    observacaoValida &&
     !(registro.recorrente && registro.parcelamento !== undefined)
   )
 }

@@ -203,10 +203,10 @@ test("calcula evolução mensal e variação com relação ao mês anterior", ()
 
 test("analisa CSV brasileiro, preserva campos citados e detecta duplicatas", () => {
   const csv = [
-    '"Título";"Valor";"Categoria";"Forma de pagamento";"Data"',
-    '"Mercado; Centro";"R$ 1.234,56";"Alimento";"Pix";"06/11/2026"',
-    '"Conta";"10,00";"Outros";"Não informado";"31/01/2026"',
-    '"Linha inválida";"0";"Outros";"Pix";"31/02/2026"',
+    '"Título";"Valor";"Categoria";"Forma de pagamento";"Data";"Observação"',
+    '"Mercado; Centro";"R$ 1.234,56";"Alimento";"Pix";"06/11/2026";"Para o escritório"',
+    '"Conta";"10,00";"Outros";"Não informado";"31/01/2026";""',
+    '"Linha inválida";"0";"Outros";"Pix";"31/02/2026";""',
   ].join("\r\n")
 
   const resultado = analisarImportacaoCsv(csv, [criarDespesa()])
@@ -220,6 +220,7 @@ test("analisa CSV brasileiro, preserva campos citados e detecta duplicatas", () 
       categoria: "alimento",
       formaPagamento: "pix",
       data: "2026-11-06",
+      observacao: "Para o escritório",
     },
   })
   assert.deepEqual(
@@ -319,6 +320,12 @@ test("rejeita data ausente em tipo inválido e mantém data opcional", () => {
   assert.equal(ehDespesa(criarDespesa({ data: undefined })), true)
   assert.equal(ehDespesa({ ...criarDespesa(), data: 20260131 }), false)
   assert.equal(ehDespesa({ ...criarDespesa(), data: "2026-02-30" }), false)
+})
+
+test("valida observação opcional com limite de 500 caracteres", () => {
+  assert.equal(ehDespesa(criarDespesa({ observacao: "Compra de escritório" })), true)
+  assert.equal(ehDespesa(criarDespesa({ observacao: "x".repeat(501) })), false)
+  assert.equal(ehDespesa({ ...criarDespesa(), observacao: 1 }), false)
 })
 
 test("detecta dados de despesas inválidos sem descartar os registros reconhecidos", () => {

@@ -5,7 +5,9 @@ Painel de despesas desenvolvido com Vite e TypeScript.
 As despesas e a meta mensal são salvas no navegador. Também é possível marcar
 lançamentos com a forma de pagamento (Pix, crédito, débito ou dinheiro) e
 filtrar e comparar os totais por método. Também é possível marcar lançamentos
-como **recorrentes** (mensal, trimestral ou anual), e o painel
+com uma observação opcional de até 500 caracteres, exibida no histórico e incluída
+nos backups e no CSV. Também é possível marcar lançamentos como **recorrentes**
+(mensal, trimestral ou anual), e o painel
 exibe um resumo dos valores recorrentes cadastrados e uma previsão para os
 próximos seis meses. O histórico também mostra a evolução dos gastos nos
 últimos seis meses e a variação em relação ao mês anterior. A previsão não
@@ -30,7 +32,7 @@ exportar despesas para planilhas. Também é possível importar CSV com prévia:
 linhas válidas são adicionadas, duplicatas são ignoradas e linhas inválidas
 são informadas antes da confirmação. O importador aceita CSV separado por
 ponto e vírgula ou vírgula, com colunas de título, valor, categoria e data;
-forma de pagamento é opcional. Na lista, é possível ordenar por data (mais
+forma de pagamento e observação são opcionais. Na lista, é possível ordenar por data (mais
 recentes ou mais antigos) ou por valor (maior ou menor); a exportação CSV
 respeita os filtros e a ordenação selecionados.
 

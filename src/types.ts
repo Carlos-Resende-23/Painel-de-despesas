@@ -35,6 +35,7 @@ export type Despesa = {
   titulo: string
   valor: number
   categoria: Categoria
+  observacao?: string
   formaPagamento?: FormaPagamento
   data?: string
   recorrente?: boolean
