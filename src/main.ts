@@ -5,13 +5,12 @@ import {
   criarBackupExportado,
   ehBackup,
   encontrarDespesaDuplicada,
-  interpretarDespesasArmazenadas,
   ordenarDespesas,
-  salvarBackupImportado,
   somarDespesas,
   somarValores,
   type OcorrenciaPrevista,
 } from "./domain.ts"
+import { RepositorioPainel } from "./storage.ts"
 import {
   CATEGORIAS,
   FORMAS_PAGAMENTO,
@@ -22,10 +21,6 @@ import {
   type FrequenciaRecorrencia,
   type LimitesCategoria,
 } from "./types.ts"
-
-const CHAVE_ARMAZENAMENTO = "painel-despesas:v1"
-const CHAVE_META_MENSAL = "painel-despesas:meta-mensal:v1"
-const CHAVE_LIMITES_CATEGORIA = "painel-despesas:limites-categoria:v1"
 
 function obterDataISOlocal(data = new Date()): string {
   const ano = data.getFullYear()
@@ -49,91 +44,32 @@ function obterDataParaFormulario(data?: string): string {
     : obterDataISOlocal(dataConvertida)
 }
 
-type EstadoCarregamentoDespesas = {
-  despesas: Despesa[]
-  dadosBrutos: string | null
-  erro: "corrompido" | "indisponivel" | null
+let repositorio: RepositorioPainel
+try {
+  repositorio = new RepositorioPainel(localStorage)
+} catch {
+  repositorio = new RepositorioPainel({
+    getItem: () => {
+      throw new Error("Armazenamento indisponível")
+    },
+    setItem: () => {
+      throw new Error("Armazenamento indisponível")
+    },
+    removeItem: () => {
+      throw new Error("Armazenamento indisponível")
+    },
+  })
 }
 
-function carregarDespesas(): EstadoCarregamentoDespesas {
-  try {
-    const dados = localStorage.getItem(CHAVE_ARMAZENAMENTO)
-    const resultado = interpretarDespesasArmazenadas(dados)
-    return {
-      despesas: resultado.despesas.map((despesa) => ({
-        ...despesa,
-        data: obterDataParaFormulario(despesa.data),
-      })),
-      dadosBrutos: dados,
-      erro: resultado.corrompido ? "corrompido" : null,
-    }
-  } catch {
-    return { despesas: [], dadosBrutos: null, erro: "indisponivel" }
-  }
-}
-
-function carregarMetaMensal(): number {
-  try {
-    const dados = localStorage.getItem(CHAVE_META_MENSAL)
-    if (!dados) return 0
-
-    const valor = Number(dados)
-    return Number.isFinite(valor) && valor >= 0 ? valor : 0
-  } catch {
-    return 0
-  }
-}
-
-function salvarMetaMensal(valor: number): boolean {
-  try {
-    localStorage.setItem(CHAVE_META_MENSAL, String(valor))
-    return true
-  } catch {
-    return false
-  }
-}
-
-function ehLimitesCategoria(valor: unknown): valor is LimitesCategoria {
-  if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
-    return false
-  }
-
-  return Object.entries(valor).every(
-    ([categoria, limite]) =>
-      CATEGORIAS.some((item) => item === categoria) &&
-      typeof limite === "number" &&
-      Number.isFinite(limite) &&
-      limite > 0,
-  )
-}
-
-function carregarLimitesCategoria(): LimitesCategoria {
-  try {
-    const dados = localStorage.getItem(CHAVE_LIMITES_CATEGORIA)
-    if (!dados) return {}
-
-    const limites: unknown = JSON.parse(dados)
-    return ehLimitesCategoria(limites) ? limites : {}
-  } catch {
-    return {}
-  }
-}
-
-function salvarLimitesCategoria(limites: LimitesCategoria): boolean {
-  try {
-    localStorage.setItem(CHAVE_LIMITES_CATEGORIA, JSON.stringify(limites))
-    return true
-  } catch {
-    return false
-  }
-}
-
-const estadoCarregamentoDespesas = carregarDespesas()
-const despesas: Despesa[] = estadoCarregamentoDespesas.despesas
-let despesasBloqueadas = estadoCarregamentoDespesas.erro !== null
-let dadosDespesasBrutos = estadoCarregamentoDespesas.dadosBrutos
-let erroCarregamentoDespesas = estadoCarregamentoDespesas.erro
-let limitesCategoria: LimitesCategoria = carregarLimitesCategoria()
+const estadoInicial = repositorio.carregar()
+const despesas: Despesa[] = estadoInicial.despesas.map((despesa) => ({
+  ...despesa,
+  data: obterDataParaFormulario(despesa.data),
+}))
+let despesasBloqueadas = estadoInicial.erro !== null
+let dadosDespesasBrutos = estadoInicial.dadosBrutos
+let erroCarregamentoDespesas = estadoInicial.erro
+let limitesCategoria: LimitesCategoria = estadoInicial.limitesCategoria
 
 function selecionarElemento<T extends Element>(seletor: string): T {
   const elemento = document.querySelector<T>(seletor)
@@ -1095,13 +1031,7 @@ function atualizarResumo(): void {
 
 function salvarDespesas(): boolean {
   if (despesasBloqueadas) return false
-
-  try {
-    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(despesas))
-    return true
-  } catch {
-    return false
-  }
+  return repositorio.salvarDespesas(despesas)
 }
 
 function atualizarVisibilidadeTiposDespesa(): void {
@@ -1525,15 +1455,7 @@ async function importarBackup(arquivo: File): Promise<void> {
     return
   }
 
-  const resultado = salvarBackupImportado(
-    localStorage,
-    {
-      despesas: CHAVE_ARMAZENAMENTO,
-      metaMensal: CHAVE_META_MENSAL,
-      limitesCategoria: CHAVE_LIMITES_CATEGORIA,
-    },
-    backup,
-  )
+  const resultado = repositorio.salvarBackup(backup)
   if (resultado !== "salvo") {
     statusBackup.textContent =
       resultado === "falhou"
@@ -1788,7 +1710,7 @@ listaLimitesCategoria.addEventListener("input", (evento: Event) => {
     delete limitesCategoria[categoria]
   }
 
-  if (!salvarLimitesCategoria(limitesCategoria)) {
+  if (!repositorio.salvarLimitesCategoria(limitesCategoria)) {
     if (typeof limiteAnterior === "number") {
       limitesCategoria[categoria] = limiteAnterior
       input.value = String(limiteAnterior)
@@ -1861,11 +1783,11 @@ inputMetaMensal.addEventListener("input", () => {
   const metaValida =
     Number.isFinite(valorMeta) && valorMeta >= 0 ? valorMeta : 0
 
-  salvarMetaMensal(metaValida)
+  repositorio.salvarMetaMensal(metaValida)
   atualizarResumo()
 })
 
-inputMetaMensal.value = String(carregarMetaMensal())
+inputMetaMensal.value = String(estadoInicial.metaMensal)
 
 atualizarAvisoArmazenamento()
 inicializarLimitesCategoria()

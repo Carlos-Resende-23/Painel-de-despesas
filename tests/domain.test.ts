@@ -20,6 +20,10 @@ import {
   type ChavesBackup,
 } from "../src/domain.ts"
 import type { Despesa } from "../src/types.ts"
+import {
+  CHAVES_PAINEL,
+  RepositorioPainel,
+} from "../src/storage.ts"
 
 const chaves: ChavesBackup = {
   despesas: "despesas",
@@ -536,5 +540,52 @@ test("sinaliza falha parcial quando também não consegue restaurar", () => {
   assert.equal(
     salvarBackupImportado(armazenamento, chaves, criarBackup()),
     "falhou-parcial",
+  )
+})
+
+test("repositorio centraliza o carregamento de despesas, meta e limites", () => {
+  const armazenamento = new ArmazenamentoEmMemoria()
+  armazenamento.valores.set(
+    CHAVES_PAINEL.despesas,
+    JSON.stringify([criarDespesa()]),
+  )
+  armazenamento.valores.set(CHAVES_PAINEL.metaMensal, "750")
+  armazenamento.valores.set(
+    CHAVES_PAINEL.limitesCategoria,
+    JSON.stringify({ outros: 300 }),
+  )
+
+  const estado = new RepositorioPainel(armazenamento).carregar()
+
+  assert.equal(estado.erro, null)
+  assert.equal(estado.despesas.length, 1)
+  assert.equal(estado.metaMensal, 750)
+  assert.deepEqual(estado.limitesCategoria, { outros: 300 })
+})
+
+test("repositorio ignora limites categoria invalidos no carregamento", () => {
+  const armazenamento = new ArmazenamentoEmMemoria()
+  armazenamento.valores.set(CHAVES_PAINEL.despesas, "[]")
+  armazenamento.valores.set(
+    CHAVES_PAINEL.limitesCategoria,
+    JSON.stringify({ categoria_invalida: 100 }),
+  )
+
+  const estado = new RepositorioPainel(armazenamento).carregar()
+
+  assert.deepEqual(estado.limitesCategoria, {})
+})
+
+test("repositorio informa falha ao salvar despesas", () => {
+  const armazenamento = new ArmazenamentoEmMemoria()
+  armazenamento.falharAoGravar = () => true
+
+  assert.equal(
+    new RepositorioPainel(armazenamento).salvarDespesas([criarDespesa()]),
+    false,
+  )
+  assert.equal(
+    armazenamento.getItem(CHAVES_PAINEL.despesas),
+    null,
   )
 })
