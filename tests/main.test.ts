@@ -131,4 +131,171 @@ describe("interface do painel", () => {
         .observacao,
     ).toBe("Compra mensal")
   })
+
+  test("exclui uma despesa e permite desfazer a exclusão", async () => {
+    await inicializarPainel([
+      {
+        id: "despesa-existente",
+        titulo: "Mercado",
+        valor: 125.5,
+        categoria: "alimento",
+        formaPagamento: "pix",
+        data: "2026-11-21",
+      },
+    ])
+
+    document.querySelector<HTMLButtonElement>(".expense-delete")!.click()
+    expect(document.querySelectorAll("#lista-despesas > li")).toHaveLength(0)
+    expect(document.querySelector("#desfazer-exclusao")?.hasAttribute("hidden")).toBe(false)
+
+    document.querySelector<HTMLButtonElement>("#desfazer-exclusao-botao")!.click()
+    expect(document.querySelectorAll("#lista-despesas > li")).toHaveLength(1)
+    expect(document.querySelector(".expense-title")?.textContent).toBe("Mercado")
+  })
+
+  test("combina filtros de texto, categoria e forma de pagamento", async () => {
+    await inicializarPainel([
+      {
+        id: "mercado-pix",
+        titulo: "Mercado da semana",
+        valor: 100,
+        categoria: "alimento",
+        formaPagamento: "pix",
+        data: "2026-11-21",
+      },
+      {
+        id: "mercado-credito",
+        titulo: "Mercado gourmet",
+        valor: 250,
+        categoria: "alimento",
+        formaPagamento: "credito",
+        data: "2026-11-20",
+      },
+      {
+        id: "livro-pix",
+        titulo: "Livro",
+        valor: 80,
+        categoria: "lazer",
+        formaPagamento: "pix",
+        data: "2026-11-19",
+      },
+    ])
+
+    const filtroTexto =
+      document.querySelector<HTMLInputElement>("#filtro-texto")!
+    const filtroCategoria =
+      document.querySelector<HTMLSelectElement>("#filtro-categoria")!
+    const filtroPagamento =
+      document.querySelector<HTMLSelectElement>("#filtro-pagamento")!
+
+    filtroTexto.value = "mercado"
+    filtroTexto.dispatchEvent(new Event("input", { bubbles: true }))
+    filtroCategoria.value = "alimento"
+    filtroCategoria.dispatchEvent(new Event("change", { bubbles: true }))
+    filtroPagamento.value = "credito"
+    filtroPagamento.dispatchEvent(new Event("change", { bubbles: true }))
+
+    expect(document.querySelectorAll("#lista-despesas > li")).toHaveLength(1)
+    expect(document.querySelector(".expense-title")?.textContent).toBe(
+      "Mercado gourmet",
+    )
+  })
+
+  test("limpa os filtros e restaura todas as despesas", async () => {
+    await inicializarPainel([
+      {
+        id: "1",
+        titulo: "Mercado",
+        valor: 100,
+        categoria: "alimento",
+        formaPagamento: "pix",
+        data: "2026-11-21",
+      },
+      {
+        id: "2",
+        titulo: "Cinema",
+        valor: 80,
+        categoria: "lazer",
+        formaPagamento: "credito",
+        data: "2026-11-20",
+      },
+    ])
+
+    const filtroTexto =
+      document.querySelector<HTMLInputElement>("#filtro-texto")!
+    filtroTexto.value = "mercado"
+    filtroTexto.dispatchEvent(new Event("input", { bubbles: true }))
+    expect(document.querySelectorAll("#lista-despesas > li")).toHaveLength(1)
+
+    document.querySelector<HTMLButtonElement>("#limpar-filtros")!.click()
+    expect(document.querySelectorAll("#lista-despesas > li")).toHaveLength(2)
+    expect(filtroTexto.value).toBe("")
+  })
+
+  test("cadastra uma despesa recorrente mensal", () => {
+    preencherDespesa()
+    document.querySelector<HTMLInputElement>("#despesa-recorrente")!.checked =
+      true
+    document
+      .querySelector<HTMLInputElement>("#despesa-recorrente")!
+      .dispatchEvent(new Event("change", { bubbles: true }))
+    document.querySelector<HTMLSelectElement>(
+      "#frequencia-recorrencia",
+    )!.value = "mensal"
+
+    document
+      .querySelector<HTMLFormElement>("#form-despesa")!
+      .dispatchEvent(
+        new SubmitEvent("submit", { bubbles: true, cancelable: true }),
+      )
+
+    const badges = Array.from(
+      document.querySelectorAll(".recurrence-badge"),
+      (elemento) => elemento.textContent,
+    )
+    expect(badges).toContain("Recorrente · Mensal")
+    expect(
+      JSON.parse(localStorage.getItem("painel-despesas:v1") ?? "[]")[0],
+    ).toMatchObject({ recorrente: true, frequencia: "mensal" })
+  })
+
+  test("valida e cadastra uma compra parcelada", () => {
+    preencherDespesa()
+    document.querySelector<HTMLInputElement>("#despesa-parcelada")!.checked =
+      true
+    document
+      .querySelector<HTMLInputElement>("#despesa-parcelada")!
+      .dispatchEvent(new Event("change", { bubbles: true }))
+    document.querySelector<HTMLInputElement>("#total-parcelas")!.value = "6"
+
+    document
+      .querySelector<HTMLFormElement>("#form-despesa")!
+      .dispatchEvent(
+        new SubmitEvent("submit", { bubbles: true, cancelable: true }),
+      )
+
+    const badges = Array.from(
+      document.querySelectorAll(".recurrence-badge"),
+      (elemento) => elemento.textContent,
+    )
+    expect(badges).toContain("Parcelamento · 1/6")
+    expect(
+      JSON.parse(localStorage.getItem("painel-despesas:v1") ?? "[]")[0],
+    ).toMatchObject({
+      parcelamento: { totalParcelas: 6, parcelasPagas: 1 },
+    })
+  })
+
+  test("bloqueia alterações quando os dados persistidos estão corrompidos", async () => {
+    vi.resetModules()
+    document.body.innerHTML = corpo
+    localStorage.clear()
+    localStorage.setItem("painel-despesas:v1", "{dados inválidos")
+    await import("../src/main.ts")
+
+    expect(document.querySelector("#aviso-armazenamento")?.hasAttribute("hidden")).toBe(false)
+    expect(
+      document.querySelector<HTMLButtonElement>("#submit-despesa")?.disabled,
+    ).toBe(true)
+  })
 })
