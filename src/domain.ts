@@ -614,7 +614,7 @@ export function interpretarDespesasArmazenadas(
   }
 }
 
-function ehLimitesCategoria(valor: unknown): valor is LimitesCategoria {
+export function ehLimitesCategoria(valor: unknown): valor is LimitesCategoria {
   if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
     return false
   }
@@ -671,16 +671,21 @@ export function somarDespesas(
   filtro: FiltroSomaDespesas = {},
 ): number {
   const hoje = dataISOlocal(new Date())
-  const despesasFiltradas = despesas.filter((despesa) => {
+  let totalEmCentavos = 0
+
+  for (const despesa of despesas) {
     const mesCorrespondente =
       filtro.mes === undefined ||
       normalizarData(despesa.data, hoje).slice(0, 7) === filtro.mes
     const categoriaCorrespondente =
       filtro.categoria === undefined || despesa.categoria === filtro.categoria
-    return mesCorrespondente && categoriaCorrespondente
-  })
 
-  return somarValores(despesasFiltradas.map(({ valor }) => valor))
+    if (mesCorrespondente && categoriaCorrespondente) {
+      totalEmCentavos += Math.round(despesa.valor * 100)
+    }
+  }
+
+  return totalEmCentavos / 100
 }
 
 export type EvolucaoMensal = {

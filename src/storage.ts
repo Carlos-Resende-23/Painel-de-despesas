@@ -1,10 +1,11 @@
 import {
+  ehLimitesCategoria,
   interpretarDespesasArmazenadas,
   salvarBackupImportado,
   type Backup,
   type ChavesBackup,
 } from "./domain.ts"
-import { CATEGORIAS, type Despesa, type LimitesCategoria } from "./types.ts"
+import type { Despesa, LimitesCategoria } from "./types.ts"
 
 export type ArmazenamentoPainel = Pick<
   Storage,
@@ -23,22 +24,6 @@ export type EstadoArmazenamentoPainel = {
   erro: "corrompido" | "indisponivel" | null
   metaMensal: number
   limitesCategoria: LimitesCategoria
-}
-
-export function ehLimitesCategoria(
-  valor: unknown,
-): valor is LimitesCategoria {
-  if (typeof valor !== "object" || valor === null || Array.isArray(valor)) {
-    return false
-  }
-
-  return Object.entries(valor).every(
-    ([categoria, limite]) =>
-      CATEGORIAS.some((item) => item === categoria) &&
-      typeof limite === "number" &&
-      Number.isFinite(limite) &&
-      limite > 0,
-  )
 }
 
 export class RepositorioPainel {
